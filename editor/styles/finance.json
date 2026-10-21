@@ -1,0 +1,16 @@
+{
+  "name": "finance",
+  "font": "Montserrat",
+  "arabic_font": "Tajawal",
+  "ink": "#f2f4f7",
+  "bg": "#0e141b",
+  "bg2": "#1e2b38",
+  "accent": "#3ba7ff",
+  "up": "#2ecc71",
+  "down": "#ff4d4f",
+  "live": "#ff4d4f",
+  "caption_size": 0.072,
+  "hook_scale": 1.4,
+  "caption_margin_v": 0.3,
+  "data_look": "market"
+}

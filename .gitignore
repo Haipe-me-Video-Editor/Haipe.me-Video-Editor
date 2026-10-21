@@ -1,0 +1,9 @@
+vendor/hf/
+__pycache__/
+.pytest_cache/
+*.mp4
+*.mov
+*.m4a
+*.wav
+.env
+.venv/

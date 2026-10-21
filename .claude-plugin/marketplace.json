@@ -1,0 +1,13 @@
+{
+  "name": "haipe-me",
+  "owner": {
+    "name": "haipe-me"
+  },
+  "plugins": [
+    {
+      "name": "claude-video-editor",
+      "source": "./",
+      "description": "Pro talking-head video editing in English and Arabic with free tools."
+    }
+  ]
+}

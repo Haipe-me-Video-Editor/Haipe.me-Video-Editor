@@ -1,0 +1,6 @@
+[
+  {"id": "noon", "start": 0, "dur": 3, "what": "midday sun over a calm sea, blue sky, rays falling", "camera": "holds", "words": "Sunlight carries every colour."},
+  {"id": "scatter", "start": 3, "dur": 3, "what": "a beam of mixed colour passes air molecules; blue bounces off in every direction", "camera": "holds", "words": "Air scatters the blue the most."},
+  {"id": "path", "start": 6, "dur": 3, "what": "diagram: short noon path vs long sunset path through the atmosphere", "camera": "holds", "words": "At sunset the light crosses far more air."},
+  {"id": "sunset", "start": 9, "dur": 3, "what": "the sun sinks into the sea under an orange and red sky", "camera": "holds", "words": "So mostly orange and red get through."}
+]

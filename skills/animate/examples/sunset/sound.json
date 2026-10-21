@@ -1,0 +1,16 @@
+{"seed": 11, "reverb": 0.3, "cues": [
+  {"type": "pad", "at": 0, "dur": 12, "notes": ["A2", "E3", "C#4", "E4"], "gain": -17, "attack": 1.2, "release": 1.5},
+  {"type": "arp", "at": 0.4, "dur": 11.4, "notes": ["A4", "C#5", "E5", "B4", "C#5", "E5"], "bpm": 84, "step": 0.5, "voice": "soft", "length": 0.7, "gain": -21},
+  {"type": "wash", "at": 0, "dur": 3.2, "low": 300, "high": 1500, "gain": -26},
+  {"type": "chime", "at": "noon+0.3", "note": "E6", "gain": -15, "pan": 0.2},
+  {"type": "whoosh", "at": "scatter-0.4", "dur": 0.9, "gain": -15, "pan": -0.4},
+  {"type": "pop", "at": "scatter+0.9", "note": 1300, "gain": -24, "pan": 0.5},
+  {"type": "pop", "at": "scatter+1.25", "note": 1500, "gain": -24, "pan": -0.3},
+  {"type": "pop", "at": "scatter+1.6", "note": 1200, "gain": -24, "pan": 0.1},
+  {"type": "pop", "at": "scatter+1.95", "note": 1650, "gain": -25, "pan": -0.6},
+  {"type": "riser", "at": "path+0.9", "dur": 1.8, "from": 180, "to": 1400, "gain": -22},
+  {"type": "chime", "at": "path+2.7", "note": "A5", "gain": -17, "pan": -0.2},
+  {"type": "wash", "at": "sunset", "dur": 3, "low": 200, "high": 1200, "gain": -24},
+  {"type": "chime", "at": "sunset+0.3", "note": "C#6", "gain": -16, "pan": 0.3},
+  {"type": "chime", "at": "sunset+2.2", "note": "A5", "dur": 3, "gain": -18}
+]}

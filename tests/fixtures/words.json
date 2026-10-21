@@ -1,0 +1,17 @@
+[
+  {"w": "So", "start": 0.5, "end": 0.7},
+  {"w": "um", "start": 0.8, "end": 1.0},
+  {"w": "today", "start": 1.1, "end": 1.5},
+  {"w": "we", "start": 1.6, "end": 1.8},
+  {"w": "launch.", "start": 1.9, "end": 2.4},
+  {"w": "Our", "start": 3.5, "end": 3.7},
+  {"w": "new", "start": 3.75, "end": 3.95},
+  {"w": "app", "start": 4.0, "end": 4.3},
+  {"w": "Our", "start": 5.0, "end": 5.2},
+  {"w": "new", "start": 5.25, "end": 5.45},
+  {"w": "app.", "start": 5.5, "end": 5.95},
+  {"w": "is", "start": 7.2, "end": 7.4},
+  {"w": "live", "start": 7.5, "end": 7.9},
+  {"w": "now.", "start": 8.0, "end": 8.5},
+  {"w": "Thanks.", "start": 8.9, "end": 9.4}
+]

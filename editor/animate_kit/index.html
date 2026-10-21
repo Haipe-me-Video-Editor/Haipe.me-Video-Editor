@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=$W, height=$H" />
+    <title>$TITLE</title>
+    <style>
+$FONTFACES
+      html,
+      body {
+        margin: 0;
+        background: #000;
+      }
+      #root {
+        position: relative;
+        width: ${W}px;
+        height: ${H}px;
+        overflow: hidden;
+      }
+      #film {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #words {
+        position: absolute;
+        inset: 0;
+      }
+    </style>
+    <script src="gsap.min.js"></script>
+    <script src="studio.js"></script>
+    <script src="timing.js"></script>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="$W" data-height="$H" data-duration="$D">
+      <canvas id="film" width="$W" height="$H"></canvas>
+      <div id="words"></div>
+    </div>
+    <script src="shots.js"></script>
+    <script>
+      document.fonts.ready.then(() => {
+        window.__timelines["main"] = buildFilm();
+      });
+    </script>
+  </body>
+</html>

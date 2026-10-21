@@ -1,0 +1,9 @@
+[project]
+name = "claude-video-editor"
+version = "0.2.0"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = ["slow: renders video, runs Chromium or downloads fonts"]

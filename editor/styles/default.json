@@ -1,0 +1,16 @@
+{
+  "name": "default",
+  "font": "Roboto",
+  "arabic_font": "IBM Plex Sans Arabic",
+  "ink": "#ffffff",
+  "bg": "#101114",
+  "bg2": "#22252c",
+  "accent": "#ff7a1a",
+  "live": "#ff3b3b",
+  "up": "#2ecc71",
+  "down": "#ff4d4f",
+  "card_bg": "#1b1d22",
+  "caption_size": 0.072,
+  "hook_scale": 1.4,
+  "caption_margin_v": 0.22
+}

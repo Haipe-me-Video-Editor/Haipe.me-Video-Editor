@@ -1,0 +1,12 @@
+numpy
+pillow
+faster-whisper
+av<19  # av 19 dropped open(metadata_errors=), which faster-whisper 1.2.1 still passes
+librosa
+soundfile
+fonttools
+opencv-python-headless<5  # 5.x no longer ships the Haar face cascade
+onnxruntime  # MODNet cutout for desk mode
+brotli
+pytest
+playwright  # app capture (python -m editor capture); uses the preinstalled Chromium, never downloads one

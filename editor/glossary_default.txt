@@ -1,0 +1,2 @@
+# One term per line: names that must be spelled exactly (brand, product, people, places).
+# Pass your own list with `analyze --glossary <file>`; a brand pack keeps its list in brands/<brand>/glossary.txt.

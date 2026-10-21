@@ -1,0 +1,9 @@
+{
+  "name": "claude-video-editor",
+  "version": "0.2.0",
+  "description": "Edits talking-head video (English, Arabic, bilingual) like a pro editor: cuts, accurate captions, HyperFrames motion graphics, B-roll, music, checked render. Free tools only.",
+  "author": {
+    "name": "haipe-me"
+  },
+  "license": "MIT"
+}
