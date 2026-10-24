@@ -47,7 +47,11 @@ def timeline_duration(plan: dict) -> float:
 
 
 def segments_hash(plan: dict) -> str:
-    return hashlib.sha1(json.dumps(plan["segments"], sort_keys=True).encode()).hexdigest()
+    """Hash of the cut. Private keys the render adds (`_grade`) are left out, so a graded render keeps
+    work/captions.json and its hand edits instead of rebuilding it."""
+    segs = [{k: v for k, v in s.items() if not k.startswith("_")} if isinstance(s, dict) else s
+            for s in plan["segments"]]
+    return hashlib.sha1(json.dumps(segs, sort_keys=True).encode()).hexdigest()
 
 
 def _num(x) -> bool:

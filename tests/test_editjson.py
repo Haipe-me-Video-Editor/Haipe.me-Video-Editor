@@ -316,6 +316,13 @@ def test_segments_hash_ignores_key_order():
     assert editjson.segments_hash(a) == editjson.segments_hash(b)
 
 
+def test_segments_hash_ignores_private_render_keys():
+    # render adds `_grade` to each segment when a grade is set; that must not make captions.json stale
+    a = editjson.new_plan([{"src": "a", "in": 1.0, "out": 2.0, "zoom": 1.0}])
+    b = editjson.new_plan([{"src": "a", "in": 1.0, "out": 2.0, "zoom": 1.0, "_grade": "eq=contrast=1.1"}])
+    assert editjson.segments_hash(a) == editjson.segments_hash(b)
+
+
 def test_load_validates_and_lists_every_error(tmp_path):
     p = _plan()
     p["format"] = "4:3"
