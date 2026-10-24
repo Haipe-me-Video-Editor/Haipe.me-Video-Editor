@@ -37,7 +37,7 @@ def damage(f: np.ndarray, k: float, rng) -> np.ndarray:
         g[:, :-o, 2] = f[:, o:, 2]
     for _ in range(int(3 + 9 * k)):  # torn slices
         y0 = int(rng.uniform(0, H))
-        h = int(rng.uniform(H * 0.004, H * 0.05 * k + 2))
+        h = int(rng.uniform(H * 0.004, max(H * 0.004 + 1, H * 0.05 * k + 2)))
         dx = int(rng.normal(0, W * 0.08 * k))
         g[y0:y0 + h] = np.roll(g[y0:y0 + h], dx, axis=1)
     for _ in range(int(4 * k)):  # macro-blocks

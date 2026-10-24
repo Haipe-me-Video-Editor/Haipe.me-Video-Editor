@@ -112,6 +112,13 @@ def test_glitch_peaks_on_the_hit_and_keeps_the_frame_size():
     assert m.shape == f.shape
 
 
+def test_glitch_weak_edges_of_the_window_on_a_full_size_frame():
+    # A 1920 px tall frame at strength 0.02-0.06 once gave a slice-height range with high < low.
+    f = np.zeros((1920, 1080, 3), np.uint8)
+    for k in (0.03, 0.045, 0.058):
+        assert glitch.damage(f, k, np.random.default_rng(1)).shape == f.shape
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("spec", [{"type": "film_look", "leak": True}, {"type": "beat_shake", "hits": [0.1, 0.5]},
                                   {"type": "glitch", "mosh": True}])
