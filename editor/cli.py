@@ -38,7 +38,8 @@ def cmd_new(a):
     (proj / "proxy").mkdir(exist_ok=True)
     src = Path(a.source)
     dst = proj / "raw" / src.name
-    shutil.copy2(src, dst)
+    if src.resolve() != dst.resolve():  # `selects` writes straight into the project's raw/
+        shutil.copy2(src, dst)
     info = ffmpeg.probe(dst)
     if not info["has_audio"]:
         sys.exit(f"{src.name} has no audio track; talking-head mode needs speech.")
@@ -226,6 +227,31 @@ def cmd_tightcut(a):
         print("kept short pauses (cut the ones that end a sentence with --cut-pauses):")
         for p in rec["pauses"]:
             print(f"  {p['at']:7.2f}  {p['gap']:.2f}s  {p['before']} | {p['after']}")
+
+
+def cmd_takes(a):
+    """The right take of every line in a long raw: writes takes.json and takes.md (read it, fix picks, run again)."""
+    from . import takes
+    rec = takes.build(a.raw, a.workdir, language=a.language, keep=[int(x) for x in _floats(a.keep)],
+                      drop=[int(x) for x in _floats(a.drop)])
+    n = sum(u["keep"] for u in rec["units"])
+    print(f"takes: {len(rec['units'])} units, {n} kept, {rec['kept_s']:.1f}s of speech in {len(rec['spans'])} spans "
+          f"from {rec['duration']:.0f}s of raw; presenter at {rec['presenter_db']} dB")
+    print(f"read {Path(a.workdir) / 'takes.md'}, then: selects {a.raw} {a.workdir}")
+
+
+def cmd_selects(a):
+    """One upright file of the kept spans (with handles) from the camera original, and the time map to it."""
+    from . import takes
+    rec = json.loads((Path(a.workdir) / "takes.json").read_text(encoding="utf-8"))
+    rotate = takes.detect_rotation(a.raw) if a.rotate == "auto" else int(a.rotate)
+    pieces = takes.selects_plan(rec["spans"], end=rec["duration"])
+    dst = Path(a.workdir) / "selects.mov"
+    takes.write_selects(a.raw, pieces, dst, rotate=rotate, size=tuple(int(v) for v in a.size.split("x")))
+    spans = [[takes.to_selects(pieces, x), takes.to_selects(pieces, y)] for x, y in rec["spans"]]
+    (Path(a.workdir) / "selects.json").write_text(json.dumps({"raw": str(a.raw), "rotate": rotate, "pieces": pieces,
+                                                             "spans": spans}, indent=1))
+    print(f"selects: {dst} ({len(pieces)} pieces, rotated {rotate}°); kept spans in its time: selects.json")
 
 
 def cmd_kwcheck(a):
@@ -582,6 +608,13 @@ def main(argv: list | None = None) -> None:
     p.add_argument("--cap-tail", help="t,max pairs: cap the hiss-tail extension at out point t")
     p.add_argument("--no-framing", action="store_true")
     p.add_argument("--format", default="9:16", choices=sorted(FORMATS))
+    p = add("takes", cmd_takes, "raw", "workdir")
+    p.add_argument("--language", default="ar")
+    p.add_argument("--keep", help="unit numbers (from takes.md) to keep, comma-separated")
+    p.add_argument("--drop", help="unit numbers (from takes.md) to drop, comma-separated")
+    p = add("selects", cmd_selects, "raw", "workdir")
+    p.add_argument("--rotate", default="auto", help="auto, 0, 90 (clockwise) or 270")
+    p.add_argument("--size", default="1440x2560", help="upright size of the selects file")
     p = add("kwcheck", cmd_kwcheck, "project")
     p.add_argument("--style", default="default")
     p.add_argument("--only", help="graphic indices, comma-separated")

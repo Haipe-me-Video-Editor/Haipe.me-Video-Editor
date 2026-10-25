@@ -24,15 +24,9 @@ A brand skill can add the event's own notes on top.
 - **Effects quiet**: `sfx_volume` 0.04, well under the music. Clip audio muted (`mute: true` on every segment).
 
 ## Colour
-- Phone and pocket-camera footage indoors comes out **yellow and flat**. Use `"grade": {"look": "clean"}`: per-shot
-  white balance, real blacks and whites, contrast on brightness only. Grade every event edit (default `clean`).
-- **White balance must be on spot, not just less yellow.** `grade.white_balance` neutralises fully along the
-  warm-cool axis (iterative grey-pixel search, bright surfaces weigh most); only the green-magenta part is capped
-  (`TINT_LIMIT`) so coloured LED light doesn't turn skin sallow. Check a known white (banner, box, wall) in a still:
-  it should read within about 3 ΔE of neutral.
-- **No extra saturation.** `punchy` adds contrast and sharpening, not saturation.
-- Relighting (brighten the person a little, dim the room a touch, via the person matte) works on stills; it is not
-  in the renderer yet.
+- **The footage keeps its camera colour** (house rule, on every edit, under any condition): no grade, no white
+  balance, no added contrast or saturation, no colour effect. The engine refuses `grade`. Check with
+  `scripts/qc/colour.py <project>` before delivering.
 
 ## Effects to offer
 - The effects toolbox is installed (see the skill's "Effects toolbox"). Show stills or a short sample first.

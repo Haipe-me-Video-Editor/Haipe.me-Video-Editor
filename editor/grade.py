@@ -109,3 +109,12 @@ def chain(m: dict, look: str = "clean") -> str:
     if spec.get("sharp"):
         parts.append(f"cas=strength={spec['sharp']}")
     return ",".join(parts)
+
+
+def curves_chain(curves: dict) -> str:
+    """A fixed grade (a brand's own, matched to its editor's cuts): per-channel curves {"r"|"g"|"b"|"all": [[in, out],
+    ...]} in 0-255, the same on every shot."""
+    def pts(p):
+        return " ".join(f"{x / 255:.4f}/{y / 255:.4f}" for x, y in p)
+    args = ":".join(f"{'master' if k == 'all' else k}='{pts(v)}'" for k, v in curves.items())
+    return f"{RGB16_IN},curves={args},{color.RGB_OUT},format=yuv444p"

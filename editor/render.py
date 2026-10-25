@@ -128,8 +128,8 @@ def segments_filter(plan: dict, src_index: dict, size: tuple, seeked: bool = Fal
         end = round(s["out"] + speed / FPS, 3)
         cut = (f"[{i}:v]trim=start=0:end={round(end - s['in'], 3)}" if seeked
                else f"[{src_index[s['src']]}:v]trim=start={s['in']}:end={end}")
-        if s.get("push"):  # slow push-in across the segment: zoom eases from z to push
-            zz = f"({z}+({s['push']}-{z})*(1-pow(1-min(t/{frames / FPS:.3f},1),2)))"
+        if s.get("push"):  # push-in: zoom eases from z to push across the segment, or over push_dur then holds
+            zz = f"({z}+({s['push']}-{z})*(1-pow(1-min(t/{s.get('push_dur', frames / FPS):.3f},1),2)))"
             size_expr = f"w='2*trunc({W}*{zz}/2)':h='2*trunc({H}*{zz}/2)':eval=frame"
         else:
             size_expr = f"{_even(W * z)}:{_even(H * z)}:force_original_aspect_ratio=increase"
@@ -413,9 +413,12 @@ def _mix(voice, music, plan: dict, sfx_files: list, total: float, dst) -> None:
         start = plan["music"].get("start", 0.0)  # seconds into the track: begin on its best section
         inputs += [*(["-ss", f"{start:.3f}"] if start else []), "-i", music]
         parts.append("[0:a]asplit=2[v][sc]")
+        # end: the bed stops early (e.g. where a logo sting takes over) with a short fade, silence after it
+        end = min(total, plan["music"].get("end", total))
+        fade = 1.5 if end >= total else plan["music"].get("end_fade", 0.25)
         parts.append(f"[1:a]aresample=48000,aformat=channel_layouts=stereo,aloop=loop=-1:size=2000000000,"
-                     f"atrim=0:{total},asetpts=PTS-STARTPTS,volume={_music_gain_db(music, plan['music'].get('lufs', MUSIC_LUFS))}dB,"
-                     f"afade=t=in:d=0.6,afade=t=out:st={max(total - 1.5, 0):.3f}:d=1.5[mus]")
+                     f"atrim=0:{end},asetpts=PTS-STARTPTS,volume={_music_gain_db(music, plan['music'].get('lufs', MUSIC_LUFS))}dB,"
+                     f"afade=t=in:d=0.6,afade=t=out:st={max(end - fade, 0):.3f}:d={fade},apad=whole_dur={total}[mus]")
         duck = {**DUCK, **plan["music"].get("duck", {})}  # how far the bed dips under the voice
         parts.append(f"[mus][sc]sidechaincompress=threshold={duck['threshold']}:ratio={duck['ratio']}:attack=15:"
                      f"release={duck['release']}[duck]")
@@ -556,7 +559,10 @@ def render(project, plan: dict, style: dict, draft: bool = False) -> dict:
     src_inputs = [arg for s in srcs for arg in ("-i", s)]
     silent = {s for s in srcs if not ffmpeg.probe(project / s)["has_audio"]}
     tr = _transcript(project)
-    if plan.get("grade"):  # measured per segment: each shot gets its own white balance and levels
+    if (plan.get("grade") or {}).get("curves"):  # a fixed grade, the same on every shot
+        fixed = grade.curves_chain(plan["grade"]["curves"])
+        plan = {**plan, "segments": [{**seg, "_grade": fixed} for seg in plan["segments"]]}
+    elif plan.get("grade"):  # measured per segment: each shot gets its own white balance and levels
         look = plan["grade"].get("look", "clean")
         plan = {**plan, "segments": [{**seg, "_grade": grade.chain(grade.measure(project / seg["src"], seg["in"],
                                                                                    seg["out"], 3), look)}
@@ -630,6 +636,9 @@ def render(project, plan: dict, style: dict, draft: bool = False) -> dict:
             from .fx.apply import hides_captions
             gaps = [(f["at"], f["at"] + f["dur"]) for f in plan["fx"] if hides_captions(f)]
             lines = [ln for ln in lines if not any(ln["start"] < b and ln["end"] > a for a, b in gaps)]
+        # a big keyword graphic can take the captions off while it is up (`hide_captions`)
+        gaps = [(g["at"], g["at"] + g["dur"]) for g in plan["graphics"] if g.get("hide_captions")]
+        lines = [ln for ln in lines if not any(ln["start"] < b - 0.05 and ln["end"] > a + 0.05 for a, b in gaps)]
         (work / "captions.ass").write_text(captions.to_ass(lines, style, size, plan["captions"].get("mode", "source"),
                                                            desks), encoding="utf-8")
         ass_rel = "work/captions.ass"

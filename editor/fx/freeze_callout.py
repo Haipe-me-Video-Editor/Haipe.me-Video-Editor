@@ -18,7 +18,7 @@ PARAMS = {
     "sub": "",          # optional smaller second line
     "hit": 0.0,         # s into the window where the picture freezes
     "hold": None,       # s frozen (default: to 0.15 s before the window ends)
-    "bg": "mono",       # mono | dim | blur | tint
+    "bg": "blur",       # blur keeps the footage's colour (house rule); mono | dim | tint recolour the room
     "lift": 1.06,       # how much bigger the frozen speaker gets
     "border": True,     # white sticker border round the lifted speaker
     "y": None,          # label centre, 0-1 of the height (default: above the head if it fits, else under the chin)

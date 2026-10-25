@@ -24,7 +24,7 @@ PARAMS = {
     "target": "face",    # face | eye | mouth | center | [x, y] in 0-1: where it settles
     "from": "left",      # sweep: left | right, the side it comes in from
     "wobble": 0.035,     # liquid edge wobble while moving, fraction of the radius
-    "fringe": 0.012,     # colour split at the rim (0: none)
+    "fringe": 0.0,       # colour split at the rim (0: none; house rule: footage colour never changes)
 }
 ENTER, EXIT = 0.7, 0.5
 

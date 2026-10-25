@@ -44,6 +44,8 @@ def _render_kit(spec: dict, style: dict, size: tuple, out_path: Path, project) -
         logo = "logo" + src.suffix
     page = kit_html(spec, style, size, {k: f.name for k, f in files.items()}, logo)
     h = hashlib.sha1(page.encode())
+    for f in sorted(files.values()):  # a rebuilt font file (same name, new outlines) must re-render
+        h.update(f.read_bytes() if f.exists() else str(f).encode())
     if logo:
         h.update(src.read_bytes())
     clip = out_path.parent / "gfx" / f"{spec['type']}-{h.hexdigest()[:16]}.mov"

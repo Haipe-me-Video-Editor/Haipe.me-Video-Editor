@@ -11,9 +11,9 @@ and checks its own work.
 - **Motion graphics:** built-in cards (hook, stat, list, quote, ticker, headline, chapter, outro), explainer
   desks with the speaker cut out, slam titles, stickers, and any custom HyperFrames composition.
 - **Signature effects:** 30 code-built effects (text behind the head, frosted type, charts, checklists, camera
-  moves, product orbits, paper collage, sticker and neon outlines, freeze-frame callouts, colour pop, film look,
-  beat shake, glitch and datamosh, motion trails, and more).
-- **Named styles:** minimal storytelling (speaker in black and white on black, line-art cards) and kinetic
+  moves, product orbits, paper collage, sticker and neon outlines, freeze-frame callouts, beat shake, motion
+  trails, and more). The footage always keeps its camera colour.
+- **Named styles:** minimal storytelling (slow camera moves, line-art cards) and kinetic
   transparent captions (big words behind the head that land on the voice), rapid visual explainer (split screen,
   a new visual on every phrase: screen recordings with a moving cursor, terminal and code cards, ranked lists).
 - **B-roll:** from your own library, or free stock (Mixkit, Internet Archive, Wikimedia Commons) with AI clips
@@ -21,7 +21,7 @@ and checks its own work.
 - **Sound:** free music from Mixkit, Incompetech, Jamendo, ccMixter and more (commercial-safe licences only, credits
   written for you), music ducked under speech, sound effects tied to what is on screen, studio voice restoration,
   -14 LUFS delivery.
-- **Look:** per-shot colour correction, face retouch, event recaps cut on the beat.
+- **Look:** the camera's own colour kept untouched, face retouch, event recaps cut on the beat.
 - **Style picker:** reads the footage (shot size, movement, the room) and the talk (tools, money, a story, a
   product, steps) and picks the editing style and a varied set of effects, so you never have to choose.
 - **Covers and thumbnails:** picks the frame with the best real expression, cuts you out and builds covers for

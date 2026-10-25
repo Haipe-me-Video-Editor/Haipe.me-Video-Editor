@@ -16,7 +16,7 @@ PARAMS = {
     "hits": [0.0],     # seconds into the window
     "amount": 0.5,     # 0-1: shake strength (1 is violent)
     "punch": 0.04,     # extra zoom on each hit
-    "split": True,     # RGB split for the first frames of each hit
+    "split": False,    # RGB split for the first frames of each hit (recolours the footage: off by house rule)
 }
 SHAKE_DUR = 0.3
 OVERSCAN = 1.03

@@ -18,32 +18,32 @@ import numpy as np
 STYLES = {
     "rapid_visual": "Rapid visual explainer: split screen, a new visual on every phrase (capture with point, stock, "
                     "terminal / code_card / rank_list), short bold captions, a soft sound on every shot.",
-    "minimal_story": "Minimal storytelling: noir_minimal on the story beats, line_art cards between, small serif "
-                     "captions, soft music, few sounds.",
+    "minimal_story": "Minimal storytelling: slow camera moves (pull_back, vertigo) on the story beats, line_art "
+                     "cards between, small serif captions, soft music, few sounds.",
     "kinetic_captions": "Kinetic transparent captions: word_stack on the words that carry each line, outline and "
                         "freeze_callout on punchlines, snap zooms on stressed words.",
     "data_explainer": "Clean data explainer: chart_grow, list_tracker, checklist, glass_type on the numbers, gentle "
-                      "zooms, color_pop for the serious beat.",
-    "energetic": "Energetic reel: beat_shake on the music, glitch between sections, motion_echo on big gestures, "
+                      "zooms, a sticker outline for the serious beat.",
+    "energetic": "Energetic reel: beat_shake on the music, zoom_through between sections, motion_echo on big gestures, "
                  "digital_zoom snaps, a sticker outline on the punchline.",
 }
 # what each style draws on, by kind: camera moves, cut-out looks, type, cards, transitions
 PALETTES = {
     "rapid_visual": {"cards": ["terminal", "code_card", "rank_list", "checklist"],
                      "type": ["word_stack", "glass_type"], "camera": ["digital_zoom", "zoom_through"],
-                     "cutout": ["outline", "freeze_callout"], "transition": ["glitch"]},
-    "minimal_story": {"cutout": ["noir_minimal", "color_pop"], "cards": ["line_art"],
+                     "cutout": ["outline", "freeze_callout"], "transition": ["zoom_through"]},
+    "minimal_story": {"cutout": ["outline"], "cards": ["line_art"],
                       "type": ["wall_text", "glass_type"], "camera": ["digital_zoom", "pull_back", "vertigo"],
-                      "transition": ["film_look"]},
-    "kinetic_captions": {"type": ["word_stack", "wall_text", "headline_wall"], "cutout": ["outline", "freeze_callout",
-                         "color_pop"], "camera": ["digital_zoom", "vertigo"], "cards": ["checklist"],
+                      "transition": ["zoom_through"]},
+    "kinetic_captions": {"type": ["word_stack", "wall_text", "headline_wall"], "cutout": ["outline", "freeze_callout"],
+                         "camera": ["digital_zoom", "vertigo"], "cards": ["checklist"],
                          "transition": ["zoom_through"]},
     "data_explainer": {"cards": ["chart_grow", "list_tracker", "checklist", "rank_list"],
                        "type": ["glass_type", "wall_text"], "camera": ["digital_zoom", "pull_back"],
-                       "cutout": ["color_pop"], "transition": ["zoom_through"]},
+                       "cutout": ["outline"], "transition": ["zoom_through"]},
     "energetic": {"camera": ["beat_shake", "digital_zoom", "vertigo", "zoom_through"],
                   "cutout": ["outline", "motion_echo", "freeze_callout"], "type": ["word_stack", "wall_text"],
-                  "transition": ["glitch"], "cards": ["rank_list"]},
+                  "transition": ["zoom_through"], "cards": ["rank_list"]},
 }
 TOPICS = {
     "tools": r"github|repo|code|claude|chatgpt|codex|\bai\b|app|website|site|tool|prompt|software|install|"
@@ -149,7 +149,7 @@ def choose(pic: dict, speech: dict, look: str = "") -> tuple:
         why.append(f"the talk is mostly about {top}")
     why.append(f"{pic.get('shot', 'medium')} shot, {'a lot of' if pic.get('movement', 0) > 0.5 else 'little'} movement")
     if pic.get("busy", 0) > 0.5:
-        why.append("a busy room: cut-out looks (color_pop, noir_minimal, outline) clean it up")
+        why.append("a busy room: a sticker outline lifts the speaker off it")
     if look:
         why.append("the creator profile's look")
     return style, why

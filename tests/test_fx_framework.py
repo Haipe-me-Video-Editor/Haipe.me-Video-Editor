@@ -44,3 +44,16 @@ def test_apply_replaces_exactly_the_window(tmp_path, monkeypatch):
     frames = np.frombuffer(raw, np.uint8).reshape(-1, 192, 108).mean(axis=(1, 2))
     bright = np.where(frames > 128)[0]
     assert bright[0] == 30 and bright[-1] == 59  # frames 30-59: exactly the 1.0-2.0 s window
+
+
+def test_effects_that_recolour_the_footage_are_refused():
+    from editor.fx.apply import check
+    bad = [{"type": "film_look", "at": 0, "dur": 2}, {"type": "color_pop", "at": 3, "dur": 2},
+           {"type": "noir_minimal", "at": 6, "dur": 2}, {"type": "glitch", "at": 9, "dur": 1},
+           {"type": "freeze_callout", "at": 11, "dur": 2, "bg": "mono"},
+           {"type": "outline", "at": 14, "dur": 2, "bg": "mono"}, {"type": "beat_shake", "at": 17, "dur": 2, "split": True}]
+    errs = check(bad)
+    assert sum("colour" in e for e in errs) == 7
+    ok = [{"type": "freeze_callout", "at": 0, "dur": 2}, {"type": "outline", "at": 3, "dur": 2},
+          {"type": "beat_shake", "at": 6, "dur": 2}]
+    assert not any("colour" in e for e in check(ok))

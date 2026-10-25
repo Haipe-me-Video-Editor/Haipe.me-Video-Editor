@@ -9,7 +9,7 @@ from .score import CALM_SFX, PLAYFUL_SFX
 
 GRAPHIC_TYPES = ("hook", "lower_third", "list", "stat", "quote", "ticker", "headline", "kinetic",
                  "credit", "chapter", "outro", "custom", "stack", "card", "badge", "bars", "leak", "endcard",
-                 "tiles", "poll", "balance", "wave", "mark", "sticker", "title")
+                 "tiles", "poll", "balance", "wave", "mark", "sticker", "title", "flag")
 CAPTION_MODES = ("source", "ar", "en", "bilingual")
 SFX_KINDS = ("whoosh", "pop", "thump", "hit", "tick", "riser", "ding", "shutter", "glitch", "coin",
              *PLAYFUL_SFX, *CALM_SFX)
@@ -133,6 +133,8 @@ def validate(plan) -> list:
                 cuts.append(round(total, 3))
         if "push" in s and not (_num(s["push"]) and 1.0 <= s["push"] <= 2.5):
             errs.append(f"segments[{i}]: push must be between 1.0 and 2.5")
+        if "push_dur" in s and not (_num(s["push_dur"]) and s["push_dur"] > 0):
+            errs.append(f"segments[{i}]: push_dur must be a positive number of seconds")
         if "zoom" in s and not (_num(s["zoom"]) and 1.0 <= s["zoom"] <= 2.5):
             errs.append(f"segments[{i}]: zoom must be between 1.0 and 2.5")
         if "focus" in s and not (isinstance(s["focus"], list) and len(s["focus"]) == 2
@@ -248,11 +250,22 @@ def validate(plan) -> list:
     if lufs is not None and not (_num(lufs) and -45 <= lufs <= -18):
         errs.append("music.lufs must be between -45 and -18 (default -33; lower is quieter)")
     g = plan.get("grade")
+    if g is not None:  # house rule (2026-10-25): footage keeps its camera colour on every edit
+        errs.append("grade is refused: the footage's colour never changes, under any condition (house rule); "
+                    "remove grade from edit.json")
     if g is not None and not (isinstance(g, dict) and g.get("look", "clean") in ("clean", "punchy", "cinematic")):
         errs.append("grade must be {\"look\": \"clean\"|\"punchy\"|\"cinematic\"}")
+    elif g is not None and "curves" in g and not (
+            isinstance(g["curves"], dict) and g["curves"] and set(g["curves"]) <= {"r", "g", "b", "all"}
+            and all(isinstance(v, list) and len(v) >= 2 and all(isinstance(q, list) and len(q) == 2 and
+                                                                 all(_num(c) and 0 <= c <= 255 for c in q) for q in v)
+                    for v in g["curves"].values())):
+        errs.append("grade.curves must be {r|g|b|all: [[in, out], ...]} with values 0-255")
     for i, o in _entries(plan, "overlays", errs):
         errs += [f"overlays[{i}]: {e}" for e in _overlay_errors(o)]
     music = plan.get("music") if isinstance(plan.get("music"), dict) else {}
+    if "end" in music and not (_num(music["end"]) and music["end"] > 0):
+        errs.append("music.end must be a positive time (timeline seconds where the bed stops)")
     if "start" in music and not (_num(music["start"]) and music["start"] >= 0):
         errs.append("music.start must be 0 or more (seconds into the track)")
     duck = music.get("duck", {})

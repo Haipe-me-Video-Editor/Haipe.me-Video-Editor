@@ -17,6 +17,8 @@ It cannot fill translations, so for `ar`, `en` or `bilingual` captions use the s
   account, a sign-in or a key, and none is ever asked for.
 - **Real footage only.** Graphics are made in code. AI *analysis* models (cut-outs, tracking, upscaling, slow motion)
   are fine: they process real footage. No AI-generated video, AI voices or AI stills.
+- **Footage colour never changes**, on any edit, under any condition. See "Colour never
+  changes" under the editing rules.
 - **Samples before full renders.** Show stills or a 10-20 s sample to test a look; render the full video only as
   the deliverable. For taste calls (looks, music, voice), show options side by side and use what the user picks.
 - **Never commit** footage, music, models or secrets. Never put a token in chat or in a file.
@@ -85,6 +87,24 @@ It cannot fill translations, so for `ar`, `en` or `bilingual` captions use the s
 11. **Cover.** For anything to be published, make the cover too (see "Covers and thumbnails"): run `cover` on the
     raw clip, view `preview.jpg` once, fix every problem it prints, and deliver the covers beside the video.
 
+## Long raw with retakes (takes, selects)
+
+A shoot file where the presenter says every line several times, with someone directing off camera, is not cut with
+`draft`: first find the right take of each line.
+- `python -m editor takes <raw> <dir>` transcribes the speech chunk by chunk (one Whisper pass over a half-hour file
+  loops on a word and drops whole minutes), splits the presenter (on the lav) from the off-camera voice by level,
+  keeps the **last complete take** of each line (earlier attempts, false starts and stumbles go), and tracks the head
+  at every keyframe: a kept take said off the lens (reading) is marked COVER, to go under B-roll. It writes
+  `takes.md` and `takes.json`; the transcript and the gaze are cached in `<dir>`.
+- Read `takes.md` against the script's logic before cutting. It is a proposal: chat with the crew that repeats no
+  line can look like a take, and a line can need its best halves from two takes. Fix picks with
+  `--keep n,n --drop n,n`.
+- `python -m editor selects <raw> <dir>` cuts the kept spans (0.4 s handles) from the camera original into one
+  upright file (a camera on its side is detected and turned) and writes `selects.json`, the spans in that file's
+  time. Make the project from the selects file.
+- Joins measured on a professional cut of such a shoot: about 0.05 s before the first word, 0.10 s after the last,
+  no pause over ~0.22 s left inside a take.
+
 ## Styles and presets
 
 A style is a JSON file of design tokens (fonts, colours, caption settings, kit settings). Pass `--style <name>` to
@@ -95,8 +115,8 @@ any `.json` file works too (relative `logo` paths resolve from the file's folder
 Presets are planning guides in `docs/presets/`:
 - **Finance, markets, crypto:** read `docs/presets/finance.md` before planning; `--style finance` unless a brand
   style applies.
-- **Event coverage / recaps (music only):** read `docs/presets/event-recap.md`. Add `"grade": {"look": "clean"}`
-  to edit.json for phone footage (per-shot white balance and contrast, no extra saturation).
+- **Event coverage / recaps (music only):** read `docs/presets/event-recap.md`. The footage keeps its camera colour
+  (house rule): no grade.
 - **Scripts before recording:** `docs/presets/research-script.md`.
 
 ## Brand packs
@@ -242,8 +262,8 @@ Layouts (all built from the same frame, so the user can pick):
 
 - `punch`: the speaker cut out with a white sticker edge on a complementary gradient, big headline. The default.
 - `frame`: the same over the real room, blurred and darkened, so the cover still says where this was filmed.
-- `minimal`: the speaker in black and white with a soft glow on a tinted gradient, serif italic headline. For
-  calm, story and premium content (the minimal story style).
+- `minimal`: the speaker with a soft glow on a tinted gradient, serif italic headline. For calm, story and premium
+  content. The speaker keeps their own colour (house rule).
 - `object` (needs `--image`): the product, screenshot or result as a tilted card beside the speaker. Use it when
   the video is about a thing the viewer can see.
 
@@ -271,7 +291,7 @@ commercial use; never commit the models or sound files.
 
 ## Signature effects (fx pack)
 
-36 effects in `editor/fx/`, one module each, built in code on real footage (no AI pixels).
+38 effects in `editor/fx/`, one module each, built in code on real footage (no AI pixels).
 `python -m editor fx-list` prints every effect, its duration range, params and `BEST_FOR` tags (`any`, `finance`,
 `product`, `playful`, `corporate`). Put them in edit.json as
 `"fx": [{"type": "wall_text", "at": 4.2, "dur": 3, "text": "FOCUS"}]` (timeline seconds; windows can't overlap;
@@ -283,8 +303,10 @@ When to use them (one effect every 8-15 s at most; each must land on a line that
 - **Section word / big claim:** `wall_text` (word behind the head), `glass_type` (frosted type), `headline_wall`.
 - **Announcement / "this is the story":** `cover_story`, `frame_break`, `news_bars` (breaking-news strips with
   BREAKING / JUST IN tags slam in round the face; `items` are the headlines, from the script).
-- **Numbers (finance, data):** `chart_grow` (values only from the script, never invented), `list_tracker`.
-- **Steps, plans, "all you need":** `checklist`.
+- **Numbers (finance, data):** `chart_grow` (values only from the script, never invented), `list_tracker`,
+  `counter_tally` (a clean page: a big number counts up to the total over a ticking list; recaps, "all N").
+- **Steps, plans, "all you need":** `checklist` (dark frosted card), `checklist_pop` (white pills pop up
+  beside the chin and tick green one by one; for a short list said out loud).
 - **Energy on a word:** `digital_zoom` (snap on the word), `vertigo`, `zoom_through` (between sections),
   `shatter` (cracks from the face, the frame breaks into glass; `hit` on the word).
 - **"Look closer" / a detail:** `lens` (a ball of liquid glass settles on the face and magnifies it),
@@ -297,19 +319,16 @@ When to use them (one effect every 8-15 s at most; each must land on a line that
 - **Playful brands only:** `paper_cut`, `doodle_boil`, `green_screen` (swap the background for stock).
 - **Sober / corporate brands:** charts, lists, `checklist`, `cover_story` and gentle zooms only.
 - **Punchline / pattern interrupt:** `outline` (sticker border or neon glow round the speaker), `freeze_callout`
-  (freeze, room goes mono, speaker lifts out bigger, a label pops in), `color_pop` (room to black and white,
-  speaker in colour).
-- **Rhythm:** `beat_shake` on music drops or stressed words (pass `hits`; never on a timer), `glitch` across a cut
-  (`mosh: true` for a datamosh smear), `motion_echo` on a big gesture.
+  (freeze, the room blurs, speaker lifts out bigger, a label pops in).
+- **Rhythm:** `beat_shake` on music drops or stressed words (pass `hits`; never on a timer), `motion_echo` on a big
+  gesture.
 - **Tech and how-to:** `terminal` (commands typing out, ✓ results), `code_card` (the line being read lights up),
   `rank_list` (#1 #2 #3 lighting in turn); `place: "top"` keeps the speaker below, `full` fills the frame.
-- **Mood / story:** `film_look` (warm grade, halation, grain, weave; `leak: true` for a light leak) for a memory or
-  a calm intro.
+- **Refused (they change the footage's colour):** `film_look`, `color_pop`, `noir_minimal`, `glitch`.
 
 Two named styles (popular short-form looks; use them when asked by name or when the profile's look fits):
-- **Minimal storytelling** ("clean, minimal line art"): `noir_minimal` on the story beats (room to black, speaker
-  black and white with a soft white glow, one lowercase serif line, `orb: true` for a drifting light), cut to
-  `line_art` cards (a white line drawing drawing itself on black, small `label` / `caption`) for the quiet beats
+- **Minimal storytelling** ("clean, minimal line art"): slow camera moves (`pull_back`, `vertigo`) on the story
+  beats, the speaker in their own colour, cut to `line_art` cards (a white line drawing drawing itself on black, small `label` / `caption`) for the quiet beats
   between. Keep captions small and the music soft; no stickers, no bright colours.
 - **Kinetic transparent captions** ("captions that move with your words"): `word_stack` on the two or three words
   that carry each line: `outline` for the setup word, `gradient` (italic serif, pastel) for the payoff, `bold` for
@@ -372,7 +391,9 @@ and `transcript_timeline.md`.
   in the free space off the speaker's head and the captions, inside the social safe zone, shrinking it to fit.
   The zone is TikTok's, the tightest platform (`editor/safezone.py`, the one place it is set): the top 13%, the
   bottom 25% (username, caption, sound) and the right 13% (the button column) stay clear. Effects, credits and a
-  card the user asks to enlarge (`scale`) obey it too. Free space is often a
+  card the user asks to enlarge (`scale`) obey it too. Hand-placed kit stacks (`pos`) are not moved for you:
+  after a render, `scripts/qc/safezone.py <project> --style <style>` measures every graphic's drawn pixels and
+  every caption line against the zone and must PASS. Free space is often a
   narrow band, so keep card text short (hook and quote ≤ 4–5 words, lists ≤ 3 short items) and
   fix every "cramped" note `render` prints by shortening the text or picking a compact type.
 - **Motion craft:** cubic easing, never linear. Start a graphic so its landing frame hits the
@@ -382,14 +403,28 @@ and `transcript_timeline.md`.
   the first 1.5 s. Concrete `query`. A `whoosh` at each entry.
 - **Punch-in:** a segment's `zoom` (1.0–2.5) crops around `focus: [x, y]` (fractions of the source frame;
   default the centre). Use it to land on a face or a reaction, e.g. `"zoom": 2.4, "focus": [0.5, 0.31]`.
+  `push` eases the zoom to a new value across the segment, or over `push_dur` seconds and then holds: split a take
+  where the move starts for an eased push on an emphasis line without a cut.
+- **Ending:** `music.end` stops the bed at a time (a short fade, then silence: a logo sting takes over).
+  `endcard {from_white: true, fade_to: "#000000", fade: 1.3}` enters through a light burn's white and closes to
+  black; `endcard {slide: 0.4}` sweeps a white panel in from the left over the last shot instead. A one-frame cover
+  (the grid thumbnail) is an `overlays` entry `{file, at: 0, dur: 0.02}`.
+- **More kit pieces:** `badge {num, look: "glow"}` (a numbered step in a glowing diamond), `card {look: "glow"}` (a
+  purple statement card whose line scrolls across, then settles), `flag` (a waving flag drawn in the browser).
+- **Captions off under a keyword:** a graphic with `hide_captions: true` takes the caption lines it overlaps off,
+  so the same words never show twice.
 - **Looks:** `looks[]` entries `{type: "bars"|"vignette", at, dur}` (timeline seconds, `dur` ≥ 1).
   `bars` slides cinematic black bars in from the top and bottom: use it to mark the serious
   moments (an admission, a hard truth, the core message), 2–5 s each, at most 2–3 per minute.
   `vignette` darkens the edges for an emotional or reflective line; use it occasionally, not on
   every serious moment. Both sit under graphics and captions and ease in and out on their own.
-- **Colour:** phone footage indoors comes out yellow and flat: `"grade": {"look": "clean"}` (per-shot white
-  balance on the warm-cool axis, real blacks and whites, contrast on brightness only). No added saturation.
-  Check a known white (a wall, a banner, a box) on a still: within about 3 ΔE of neutral.
+- **Colour never changes.** The footage keeps the colour the camera recorded, on every edit, under any condition:
+  no grade, no white balance or per-shot correction, no tint, no black and white, no colour effect. The engine refuses
+  `grade` and the effects that recolour footage (`film_look`, `color_pop`, `noir_minimal`, `glitch`, and the
+  black-and-white or tinted options of `freeze_callout`, `outline`, `motion_echo`, `beat_shake`, and `lens` with a
+  colour `fringe`). Graphics, B-roll and
+  the light-burn transitions sit over the footage; they never change it. Before delivering, run
+  `scripts/qc/colour.py <project>`: it compares the final with the source at the same crop and fails on any shift.
 - **Sound:** every effect is tied to something visible; at most one per second. `pop` only on
   one or two emphasis words.
 - **Never** use AI-generated footage. Never invent facts, numbers or quotes: every word in a graphic comes from the

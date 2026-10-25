@@ -27,6 +27,7 @@ SPECS = {
     "mark": {"text": "Made with care."},
     "sticker": {"src": "logo.png", "pos": [0.8, 0.3], "w": 0.25},
     "title": {"text": "LOREM", "sub": "النتائج"},
+    "flag": {"pos": [0.2, 0.2], "w": 0.36},
 }
 
 MARK = {"word": "acme", "badge": "#000000", "view": 100, "bars": [["#4c6ef5", 12, 30], ["#4c6ef5", 34, 50], ["#4c6ef5", 56, 70], ["#4c6ef5", 78, 90]]}
@@ -121,3 +122,47 @@ def test_title_sticker_letters_keep_arabic_words_apart():
     assert "flex-direction:row-reverse" in page        # the first word sits on the right, where Arabic starts
     latin = kit_html({"type": "title", "dur": 2.0, "text": "PLAY"}, style, SIZE, FONTS)
     assert "#row{gap:0px}" in latin and "flex-direction:row}" in latin
+
+
+def test_stack_tags_kashida_icons_and_tilt():
+    page = kit_html({"type": "stack", "dur": 2.0, "rotate": -8, "lines": [
+        {"text": "Spot Market", "font": "latin", "box": "accent", "anim": "type"},
+        {"text": "متداولــــين", "anim": "stretch", "t": 0.4},
+        {"text": "file", "icon": "file", "color": "#2F7BF5", "opacity": 0.9}]}, STYLE, SIZE, FONTS)
+    assert f"background:{STYLE['accent']}" in page  # the tag's solid block in the accent
+    assert 'clipPath:"inset(-20% 100% -20% 0%)"' in page and "scaleX:.45" in page
+    assert "rotate(-8deg)" in page and "<svg viewBox" in page and "color:#2F7BF5" in page
+
+
+def test_endcard_can_enter_from_white_and_fade_to_black():
+    page = kit_html({"type": "endcard", "dur": 7.8, "text": "ACME", "from_white": True, "fade_to": "#000000",
+                     "fade": 1.3}, STYLE, SIZE, FONTS)
+    assert 'tl.set("#wb",{backgroundColor:"#ffffff"},0)' in page and "background:#000000" in page
+    assert "6.50);" in page  # the veil starts fade seconds before the end
+
+
+def test_push_duration_and_music_end_are_validated():
+    p = editjson.new_plan([{"src": "a.mp4", "in": 0, "out": 10, "zoom": 1.1, "push": 1.2, "push_dur": 0.4}])
+    p["music"] = {"src": None, "end": 8.0}
+    assert editjson.validate(p) == []
+    p["segments"][0]["push_dur"] = 0
+    p["music"]["end"] = -1
+    errs = editjson.validate(p)
+    assert any("push_dur" in e for e in errs) and any("music.end" in e for e in errs)
+
+
+def test_badge_takes_a_number_and_a_glow_look():
+    html = kit_html({"type": "badge", "at": 0, "dur": 2, "num": "3", "look": "glow"}, STYLE, SIZE, FONTS)
+    assert ">3</div>" in html and "radial-gradient" in html
+
+
+def test_glow_card_scrolls_its_line_then_settles_it():
+    html = kit_html({"type": "card", "look": "glow", "at": 0, "dur": 5, "lines": [
+        {"text": "جملة طويلة", "scroll": [0.25, 3.75], "settle": 3.8}, {"text": "Price Discovery", "t": 3.85}]},
+        STYLE, SIZE, FONTS)
+    assert "offsetWidth" in html and "scale:0.62" in html and "Price Discovery" in html
+
+
+def test_endcard_slide_brings_a_white_panel_in_from_the_left():
+    html = kit_html({"type": "endcard", "at": 0, "dur": 3, "slide": 0.45}, STYLE, SIZE, FONTS)
+    assert 'id="pn"' in html and "xPercent:-120" in html
