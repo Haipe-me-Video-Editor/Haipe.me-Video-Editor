@@ -2,6 +2,7 @@
 import html
 import re
 
+from .. import safezone
 from ..captions import WESTERN_DIGITS, is_arabic
 from .spring import SPRING_TAG, spring_in
 
@@ -44,7 +45,7 @@ body{margin:0;background:transparent}
 #bloom{position:absolute;left:50%%;top:50%%;width:40vmin;height:40vmin;margin:-20vmin 0 0 -20vmin;border-radius:50%%;
   background:radial-gradient(circle,#fff 0,rgba(255,255,255,.85) 25%%,rgba(255,255,255,0) 70%%);opacity:0}
 .fixed{position:absolute;inset:0}
-#credit{position:absolute;left:7%%;bottom:22%%;transform:rotate(-90deg);transform-origin:left bottom;white-space:nowrap;
+#credit{position:absolute;left:7%%;bottom:%(credit_bottom)s%%;transform:rotate(-90deg);transform-origin:left bottom;white-space:nowrap;
   font-weight:700;font-size:2.8vmin;letter-spacing:.3vmin;text-transform:uppercase;text-shadow:0 .3vmin 1.2vmin rgba(0,0,0,.8)}
 #chapter{position:absolute;top:14%%;left:0;right:0;display:flex;justify-content:center}
 #chapter .pill{display:flex;gap:1.6vmin;align-items:center;font-weight:700;font-size:3.6vmin;padding:1.4vmin 3vmin;
@@ -202,6 +203,7 @@ def composition_html(spec: dict, style: dict, size: tuple, font_files: dict, log
     slot = {"top": slot["top"] * 100, "height": slot["height"] * 100, "scale": slot["scale"]} if slot else DEFAULT_SLOT
     css = CSS % {"latin": font_files["latin"], "arabic": font_files["arabic"],
                  "family": '"BrandAR"' if rtl else '"BrandLT"', "ink": style["ink"], "accent": style["accent"],
+                 "credit_bottom": round(safezone.BOTTOM * 100 + 1, 1),
                  "up": style.get("up", "#22c55e"), "down": style.get("down", "#ef4444"),
                  "bg": style.get("bg", "#101114"), "bg2": style.get("bg2", style.get("bg", "#101114")),
                  "top": round(slot["top"], 2), "height": round(slot["height"], 2), "scale": slot["scale"]}
@@ -224,6 +226,9 @@ def composition_html(spec: dict, style: dict, size: tuple, font_files: dict, log
                                "snappy", .6))
     enter = spring_in("#card", enter, "x:0,y:0,opacity:1,duration:.45", ENTRANCE.get(t, "gentle"), 0)
     family = "BrandAR" if rtl else "BrandLT"
+    # the end card holds to the last frame; fading it out would flash the speaker back in as the video ends
+    exit = "" if t == "outro" else (f'tl.to("#card", {{y: -20, opacity: 0, duration: .3, ease: "power2.in"}}, '
+                                    f'{max(d - 0.3, 0.5)});')
     return f"""<!doctype html>
 <html lang="{'ar' if rtl else 'en'}"><head><meta charset="UTF-8"><script src="gsap.min.js"></script>{SPRING_TAG}
 <style>{css}</style></head><body>
@@ -235,7 +240,7 @@ document.fonts.ready.then(() => {{
   const tl = gsap.timeline({{paused: true}});
   {enter}
   {stagger}
-  tl.to("#card", {{y: -20, opacity: 0, duration: .3, ease: "power2.in"}}, {max(d - 0.3, 0.5)});
+  {exit}
   window.__timelines["g"] = tl;
 }});
 </script></body></html>

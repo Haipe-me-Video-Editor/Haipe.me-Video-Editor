@@ -147,6 +147,16 @@ def layout(sc: sp.Scene, groups: dict, bottom: float, k: float) -> dict:
     return {"box": box, "box_plane": box_plane, "cards": cards, "word_y": word_y, "word_cx": cx}
 
 
+def fit_layout(sc: sp.Scene, groups: dict, bottom: float, k: float) -> dict:
+    """layout() at the largest size (down to 70%) whose command box clears the chin inside the safe zone, so a
+    close-up never has the box over the face. Returns the layout with the scale it used as "k"."""
+    for f in (1.0, 0.9, 0.8, 0.7):
+        lay = layout(sc, groups, bottom, k * f)
+        if not lay["box"] or lay["box_plane"] == "back" or lay["box"][1] >= sc.chin:
+            break
+    return {**lay, "k": k * f}
+
+
 def _overlap(a, b) -> float:
     if a is None or b is None:
         return 0.0
@@ -170,7 +180,8 @@ def render(ctx):
     k = ctx.W / 1080
     groups = split_panels(ctx.param("panels", PARAMS["panels"]))
     sc = sp.scene(ctx)
-    lay = layout(sc, groups, float(ctx.param("bottom", PARAMS["bottom"])), k)
+    lay = fit_layout(sc, groups, float(ctx.param("bottom", PARAMS["bottom"])), k)
+    k = lay["k"]
     th = sp.theme(ctx.style, ctx.param("theme", PARAMS["theme"]))
     D = ctx.dur
     words = [w for w in (ctx.param("words", PARAMS["words"]) or []) if str(w).strip()]

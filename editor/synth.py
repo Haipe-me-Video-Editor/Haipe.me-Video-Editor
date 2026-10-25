@@ -162,13 +162,11 @@ def soft(c, rng):
     return (np.sin(2 * np.pi * f * t) + 0.25 * np.sin(4 * np.pi * f * t)) * _decay(len(t), dur)
 
 
-VOICES = {"pluck": pluck, "chime": chime, "soft": soft}
-
-
 def arp(c, rng):
-    """Notes played in turn: notes, dur, bpm (90), step (0.5 = eighths), voice (pluck|chime|soft), length (0.9 s)."""
+    """Notes played in turn: notes, dur, bpm (90), step (0.5 = eighths), voice (pluck|chime|soft|glock), length
+    (0.9 s)."""
     step = 60 / c.get("bpm", 90) * c.get("step", 0.5)
-    voice = VOICES[c.get("voice", "pluck")]
+    voice = {"pluck": pluck, "chime": chime, "soft": soft, "glock": glock}[c.get("voice", "pluck")]
     n = int(c["dur"] * SR)
     out = np.zeros(n + int(4 * SR))
     notes = c.get("notes", ["A4", "C5", "E5"])
@@ -240,6 +238,89 @@ def wash(c, rng):
     return _bandnoise(n, c.get("low", 200) * drift, c.get("high", 1800) * drift, rng) * _env(n, 1.0, 1.5)
 
 
+def boing(c, rng):
+    """A springy cartoon bounce, for a hop or a squash: note (220 Hz), dur (0.45), wobble (14 Hz)."""
+    dur = c.get("dur", 0.45)
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    f0 = freq(c.get("note", 220))
+    rise = 0.7 + 0.9 * (1 - np.exp(-t / 0.05))
+    wobble = 1 + 0.18 * np.sin(2 * np.pi * c.get("wobble", 14) * t) * np.exp(-t / (0.5 * dur))
+    sweep = f0 * rise * wobble
+    return (np.sin(_phase(sweep)) + 0.2 * np.sin(2 * _phase(sweep))) * _decay(n, dur)
+
+
+def glock(c, rng):
+    """A glockenspiel bar: bright, short and pure. note (C6), dur (1.2)."""
+    dur = c.get("dur", 1.2)
+    t = _t(dur)
+    f = freq(c.get("note", "C6"))
+    out = np.zeros_like(t)
+    for ratio, amp, life in ((1, 1, 1), (2.76, 0.25, 0.25), (5.4, 0.1, 0.1)):
+        if f * ratio < SR / 2 - 1000:
+            out += amp * np.sin(2 * np.pi * f * ratio * t) * _decay(len(t), dur * life)
+    return out
+
+
+def kick(c, rng):
+    """A soft round kick drum: note (52 Hz), dur (0.35)."""
+    n = int(c.get("dur", 0.35) * SR)
+    f0 = freq(c.get("note", 52))
+    body = np.sin(_phase(f0 * (1 + 2.2 * np.exp(-np.arange(n) / (0.025 * SR))))) * _decay(n, c.get("dur", 0.35))
+    return body + 0.15 * _bandnoise(n, 800, 3000, rng) * _decay(n, 0.01)
+
+
+def snare(c, rng):
+    """A dusty snare or rim: dur (0.2), tone (190 Hz)."""
+    n = int(c.get("dur", 0.2) * SR)
+    t = np.arange(n) / SR
+    tone = np.sin(2 * np.pi * c.get("tone", 190) * t) * _decay(n, 0.08)
+    return 0.5 * tone + _bandnoise(n, 1200, 7000, rng) * _decay(n, c.get("dur", 0.2))
+
+
+def hat(c, rng):
+    """A closed hi-hat: dur (0.05)."""
+    n = int(c.get("dur", 0.05) * SR)
+    return _bandnoise(n, 6000, 14000, rng) * _decay(n, c.get("dur", 0.05))
+
+
+DRUMS = {"kick": kick, "snare": snare, "hat": hat}
+DRUM_LEVEL = {"kick": 1.0, "snare": 0.55, "hat": 0.25}
+LOFI = {"kick": "x.......x.x.....", "snare": "....x.......x...", "hat": "x.x.x.x.x.x.x.x."}
+
+
+def beat(c, rng):
+    """A drum loop from step patterns, one character per 16th note ("x" hit, "o" soft hit, "." rest):
+    dur, bpm (120), swing (0 to 0.3: late off-beats, the lo-fi lean), and one pattern per drum, e.g.
+    {"kick": "x.......x.x.....", "snare": "....x.......x...", "hat": "x.x.x.x.x.x.x.x."} (the default when no
+    pattern is given). Patterns repeat."""
+    step = 60 / c.get("bpm", 120) / 4
+    n = int(c["dur"] * SR)
+    out = np.zeros(n + SR)
+    patterns = {k: c[k] for k in DRUMS if k in c} or LOFI
+    for name, voice in DRUMS.items():
+        pattern = patterns.get(name, "")
+        if not pattern:
+            continue
+        hits = {"x": voice({}, rng), "o": 0.5 * voice({}, rng)}
+        for i in range(int(c["dur"] / step)):
+            hit = hits.get(pattern[i % len(pattern)])
+            if hit is None:
+                continue
+            at = int((i + (c.get("swing", 0) if i % 2 else 0)) * step * SR)
+            out[at:at + len(hit)] += hit * DRUM_LEVEL[name]
+    return out[:n]
+
+
+def crackle(c, rng):
+    """Vinyl crackle and hiss under a lo-fi beat: dur, density (40 pops a second)."""
+    n = int(c["dur"] * SR)
+    out = 0.15 * _bandnoise(n, 2000, 9000, rng)
+    pops = rng.integers(0, n, int(c.get("density", 40) * c["dur"]))
+    out[pops] += rng.uniform(-1, 1, len(pops)) * 3
+    return _lowpass(out, 7000) * _env(n, 0.5, 0.5)
+
+
 def audio_file(c, rng):
     """A local audio file, such as a free-licence track: path, dur (optional trim)."""
     from . import ffmpeg
@@ -249,6 +330,7 @@ def audio_file(c, rng):
 
 CUES = {"pad": pad, "drone": drone, "chime": chime, "pluck": pluck, "soft": soft, "arp": arp, "whoosh": whoosh,
         "riser": riser, "impact": impact, "pop": pop, "drip": drip, "tick": tick, "hum": hum, "wash": wash,
+        "boing": boing, "glock": glock, "kick": kick, "snare": snare, "hat": hat, "beat": beat, "crackle": crackle,
         "file": audio_file}
 
 
@@ -275,7 +357,7 @@ def render(spec: dict, duration: float, starts: dict | None = None) -> np.ndarra
         kind = c.get("type")
         if kind not in CUES:
             raise ValueError(f"cue {i}: unknown type {kind!r}; types: {', '.join(CUES)}")
-        if kind in ("pad", "drone", "arp", "hum", "wash") and "dur" not in c:
+        if kind in ("pad", "drone", "arp", "hum", "wash", "beat", "crackle") and "dur" not in c:
             raise ValueError(f"cue {i} ({kind}) needs a dur in seconds")
         at = resolve_at(c.get("at", 0), starts)
         x = CUES[kind](c, rng)

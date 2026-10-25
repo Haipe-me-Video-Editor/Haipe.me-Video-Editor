@@ -7,10 +7,10 @@ fits best and is scaled down to fit it. Fractions are of the frame height unless
 """
 import math
 
-from . import captions, faces as faces_mod
+from . import captions, faces as faces_mod, safezone
 
-SAFE_TOP, SAFE_BOTTOM = 0.13, 0.80
-SAFE_LEFT, SAFE_RIGHT = 0.06, 0.12  # fractions of the width; the right edge holds the UI buttons
+SAFE_TOP, SAFE_BOTTOM = safezone.Y0, safezone.Y1
+SAFE_LEFT, SAFE_RIGHT = 0.06, safezone.RIGHT  # fractions of the width; the right edge holds the UI buttons
 PAD = 0.015  # gap kept between a card and the face or the captions
 MIN_SCALE = 0.6  # below this the text gets too small to read on a phone
 ASSUMED_HEAD = (0.10, 0.60)  # talking-head selfie framing, used when no face was detected

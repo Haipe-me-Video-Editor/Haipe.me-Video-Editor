@@ -192,7 +192,9 @@ def desk_html(spec: dict, style: dict, size: tuple, font_files: dict, image: str
 <section class="clip" data-start="0" data-duration="{d}"><div id="bg"></div><div id="grid"></div>{streaks}{mark}
 <div id="panel">{_card(card, style, image)}</div></section></div>
 <script>
-document.fonts.ready.then(() => {{
+// load the faces the check asserts even when this card's text never uses them (an all-Arabic card never asks for
+// BrandLT, so the browser would never fetch it and the check below would fail)
+Promise.all(["BrandLT", "BrandDS"].map(f => document.fonts.load('700 40px "' + f + '"'))).then(() => document.fonts.ready).then(() => {{
   for (const f of ["BrandLT", "BrandDS"]) if (!document.fonts.check('700 40px "' + f + '"')) throw new Error("font " + f + " did not load");
   const fit = () => {{ const p = document.getElementById("panel"); let k = 1;
     while (p.scrollHeight > p.clientHeight + 1 && k > .55) {{ k -= .03; document.getElementById("root").style.setProperty("--k", k); }} }};

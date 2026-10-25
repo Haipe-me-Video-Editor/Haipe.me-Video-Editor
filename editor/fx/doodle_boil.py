@@ -7,7 +7,7 @@ import math
 import cv2
 import numpy as np
 
-from .. import fonts
+from .. import fonts, safezone
 from . import _cutkit as K
 
 NAME = "doodle_boil"
@@ -32,7 +32,7 @@ PARAMS = {
                             # [{file, w?: 0.3, at?: 0.6, x?, y?}] (w a fraction of the width; x, y its centre)
 }
 
-SAFE = (0.05, 0.14, 0.86, 0.78)  # x0, y0, x1, y1 of where doodles may go (platform UI clear)
+SAFE = (0.05, 0.14, min(0.86, safezone.X1), min(0.78, safezone.Y1))  # x0, y0, x1, y1 where doodles may go
 
 
 def render(ctx):

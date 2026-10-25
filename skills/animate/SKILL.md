@@ -1,6 +1,6 @@
 ---
 name: animate
-description: Make a short animated film (an explainer, a kids' story, a mood piece) where every frame is drawn in code and the sound is synthesised, from a topic, a length, a format and a few style references. Researches the facts, writes a style bible and a shot list, draws each shot on a canvas, checks snapshots against the bible, then renders a checked MP4. No video or image model and no voice. Use when the user says "animate", "make an animation", "an animated explainer about X", "a cartoon of X", or shares a style reference and asks for a film in that look.
+description: Make a short animated explainer or motion piece (a how-it-works film, a data story, a mood piece, visual effects and add-ons for an explanation) where every frame is drawn in code and the sound is synthesised, from a topic, a length, a format and a few style references. Researches the facts, writes a style bible and a shot list, draws each shot on a canvas, checks snapshots against the bible, then renders a checked MP4. No video or image model and no voice. Use when the user says "animate", "make an animation", "an animated explainer about X", "a cartoon of X", or shares a style reference and asks for a film in that look.
 ---
 
 # Animate
@@ -14,11 +14,14 @@ container run `bash scripts/setup.sh` once.
   video model, image model, stock footage or AI voice. Words on screen are real text.
 - **References are for reading the style only.** Look at them, describe them in the style bible, and draw the film
   yourself. Never trace, copy or show a reference in the film (`animate-render` refuses a film that contains one).
-- **The user's own character art is the exception.** When they own a mascot with finished renders (a set of pose
-  cut-outs), animate those renders as cut-outs: move, squash and stretch them with the pivot at the feet, and pop
-  from pose to pose. Never redraw the character in code, which drifts off model. Put the renders in `comp/art/`
-  (not `refs/`), load them before the timeline is built (`Promise.all([document.fonts.ready, loadArt()])` in
-  `index.html`, where `loadArt()` resolves once every `Image` has loaded), and draw everything around them in code.
+- **Code drawing is for explainers, visual effects and add-ons, never for a character.** Diagrams, backgrounds,
+  icons, hearts, sparkles, captions and logos are drawn in code. A character the user already has (a mascot, a
+  brand figure) is never redrawn in code: code cannot reach the finish of their artwork, and a code redraw of one
+  was rejected as "very bad art, it doesn't match" (2026-10-21).
+- **A character the user owns is animated from its own renders.** Put the pose renders in `comp/art/` (not
+  `refs/`), load them before the timeline is built (`Promise.all([document.fonts.ready, loadArt()])` in
+  `index.html`), and move, squash and swap them pose to pose with the pivot at the feet; draw only the world and
+  the effects around them in code.
 - **Facts are checked.** An explainer states only what the research found, with a source for each fact.
 - **Free tools only**, and nothing needs an account or a key.
 - Work in a scratch folder, never inside the repo.

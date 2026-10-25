@@ -14,8 +14,10 @@ from pathlib import Path
 
 import numpy as np
 
-# 9:16 safe zone (fractions of the frame): platform UI covers the top 13%, bottom 20% and right 12%.
-SAFE = {"x0": 0.04, "x1": 0.88, "y0": 0.135, "y1": 0.80}
+from .. import safezone
+
+# 9:16 safe zone (fractions of the frame), from editor/safezone.py: clear of the platform UI.
+SAFE = {"x0": safezone.X0, "x1": safezone.X1, "y0": 0.135, "y1": safezone.Y1}
 GRID = 8  # coverage map is 1/GRID of the frame
 _AR = re.compile(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")
 

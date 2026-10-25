@@ -238,9 +238,7 @@ def check_drawn(film) -> None:
 
 
 def render(film, out=None, quality: str = "delivery", silent: bool = False, run_qc: bool = True) -> Path:
-    from . import qc
     from .graphics.render import _hf, check_local
-    from .render import normalize
     film = Path(film).resolve()
     brief, shots = load(film)
     check_drawn(film)
@@ -254,22 +252,30 @@ def render(film, out=None, quality: str = "delivery", silent: bool = False, run_
     _hf(["render", ".", "--format", "mp4", "--fps", str(brief["fps"]), "--quality", quality,
          "--video-bitrate", "14M", "-o", str(picture)], comp)
     out = Path(out) if out else film / "out" / "film.mp4"
+    return mux(picture, None if silent else sound(film), out, duration(shots), work, (brief["width"], brief["height"]),
+               run_qc)
+
+
+def mux(picture, wav, out, total: float, work, size: tuple, run_qc: bool = True) -> Path:
+    """The picture with its sound at -14 LUFS (or silence when wav is None), checked by qc."""
+    from . import qc
+    from .render import normalize
+    out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    total = duration(shots)
-    if silent:
+    if wav is None:
         audio = ["-f", "lavfi", "-t", f"{total}", "-i", "anullsrc=r=48000:cl=stereo"]
     else:
-        norm = normalize(sound(film), work / "sound-14lufs.wav")
+        norm = normalize(wav, Path(work) / "sound-14lufs.wav")
         # AAC adds up to ~1 dB to the peaks it is given (short pops and plucks most): a ceiling at -2.5 dBFS keeps
         # the encoded file under qc's -1 dBTP without touching the loudness
-        safe = work / "sound-safe.wav"
+        safe = Path(work) / "sound-safe.wav"
         ffmpeg.run(["-i", str(norm), "-af", "alimiter=limit=0.75:level=false:attack=1:release=40", str(safe)])
         audio = ["-i", str(safe)]
     ffmpeg.run(["-i", str(picture), *audio, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac",
                 "-b:a", "192k", "-ar", "48000", "-t", f"{total}", "-movflags", "+faststart", str(out)])
     if run_qc:
-        r = qc.qc(out, size=(brief["width"], brief["height"]))
-        if silent:
+        r = qc.qc(out, size=size)
+        if wav is None:
             r["checks"] = [c for c in r["checks"] if c["name"] not in ("loudness", "true_peak")]
             r["passed"] = all(c["ok"] for c in r["checks"])
         print(f"qc {out.name}\n{qc.report(r)}")

@@ -10,9 +10,11 @@ import re
 
 import numpy as np
 
+from .. import safezone
+
 GLASS_A = 0.5  # the fill alpha every glass card uses; glass_stack reads card coverage from it
 
-SAFE_TOP, SAFE_BOTTOM, SAFE_RIGHT, SAFE_LEFT = 0.13, 0.20, 0.12, 0.05  # 9:16 platform UI margins
+SAFE_TOP, SAFE_BOTTOM, SAFE_RIGHT, SAFE_LEFT = safezone.TOP, safezone.BOTTOM, safezone.RIGHT, 0.05  # platform UI margins
 
 _AR = re.compile(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")
 
@@ -130,6 +132,19 @@ def place(W, H, hd, w0, h0, prefer=("above", "left", "right", "below"), min_scal
     x = min(max(x, SAFE_LEFT * W), (1 - SAFE_RIGHT) * W - w)
     y = min(max(y, SAFE_TOP * H), (1 - SAFE_BOTTOM) * H - h)
     return {"region": name, "scale": s, "x": x, "y": y, "w": w, "h": h}
+
+
+def rescale(spot: dict, W, H, w0, h0, scale: float) -> dict:
+    """The spot at a size the user asked for, kept inside the safe zone: capped to the largest scale the safe
+    rectangle holds, grown about the spot's centre, then pushed back inside (a bigger card once ran into
+    TikTok's caption block and button column)."""
+    sx0, sx1, sy0, sy1 = SAFE_LEFT * W, (1 - SAFE_RIGHT) * W, SAFE_TOP * H, (1 - SAFE_BOTTOM) * H
+    s = min(scale, (sx1 - sx0) / w0, (sy1 - sy0) / h0)
+    w, h = w0 * s, h0 * s
+    cx, cy = spot["x"] + spot["w"] / 2, spot["y"] + spot["h"] / 2
+    x = min(max(cx - w / 2, sx0), sx1 - w)
+    y = min(max(cy - h / 2, sy0), sy1 - h)
+    return {**spot, "scale": s, "x": x, "y": y, "w": w, "h": h}
 
 
 # ---- frosted glass ------------------------------------------------------------------------------------------

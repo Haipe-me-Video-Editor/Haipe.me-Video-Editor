@@ -133,6 +133,7 @@
   // Build the film. `shots` carry id, start, dur (from shots.json) and a draw function:
   //   draw(ctx, s) with s = { t, local, p, dur, w, h }: t is film time, local is time inside the shot, p is 0..1.
   // Neighbouring shots cross-fade over `blend` seconds. `post(ctx, t)` runs last on every frame (grain, vignette).
+  // `background: null` leaves the canvas transparent, to draw over <video> clips placed under it.
   // Returns the paused timeline; add DOM tweens to it, then register it as the last line of the build.
   function film({ canvas, duration, shots, blend = 0.35, post = null, background = "#000" }) {
     const ctx = canvas.getContext("2d");
@@ -150,10 +151,14 @@
 
     function frame() {
       const t = state.t;
-      ctx.save();
-      ctx.fillStyle = background;
-      ctx.fillRect(0, 0, w, h);
-      ctx.restore();
+      if (background) {
+        ctx.save();
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+      } else {
+        ctx.clearRect(0, 0, w, h); // a transparent layer over video clips or DOM
+      }
       let i = order.findIndex((s) => t < s.start + s.dur);
       if (i < 0) i = order.length - 1;
       const cur = order[i], next = order[i + 1];
