@@ -91,7 +91,7 @@ def render(ctx):
     prefer = ("above", "left", "right", "below") if where == "auto" else (where,)
     spot = G.place(ctx.W, ctx.H, hd, w0, h0, prefer=prefer, max_scale=1.0)
     if ctx.param("scale"):
-        spot["scale"] = float(ctx.param("scale"))
+        spot = G.rescale(spot, ctx.W, ctx.H, w0, h0, float(ctx.param("scale")))
     page = _page(ctx, items, title, ticks, shows, spot, w0, h0)
     layer = ctx.layer(page, "checklist")
     return G.glass_stack(ctx, layer, blur=30)

@@ -164,6 +164,8 @@ def cmd_draft(a):
         track = music.choose(music.build_index(Path(a.music_dir), proj / "music-index.json"), total)
     if track:
         plan["music"]["src"] = str((Path(a.music_dir) / track["file"]).resolve())
+        from . import musicsrc
+        plan["music"]["credit"] = musicsrc.credit_for(plan["music"]["src"])  # a CC BY track found by music-find
     else:
         score.write_score(proj / "work" / "score.wav", total + 0.5)
         plan["music"]["src"] = "work/score.wav"
@@ -503,6 +505,11 @@ def main(argv: list | None = None) -> None:
     from . import stylepick
     p = add("style-pick", stylepick.cmd, "project")
     p.add_argument("--check", action="store_true", help="check edit.json against the variety rules instead")
+    from . import musicsrc
+    p = add("music-find", musicsrc.cmd, "query", "dest")
+    p.add_argument("--sources", nargs="+", default=list(musicsrc.SOURCES), choices=musicsrc.SOURCES)
+    p.add_argument("--n", type=int, default=3, help="candidates per library")
+    p.add_argument("--min-dur", type=float, default=0, help="skip tracks shorter than this (seconds)")
     add("fx-list", cmd_fx_list)
     p = add("fx-apply", cmd_fx_apply, "video", "fx", "out")
     p.add_argument("--style", default="default")
@@ -522,6 +529,12 @@ def main(argv: list | None = None) -> None:
     add("fetch", fetch.cmd, "link", "dest")
     from . import animate
     animate.register(add)
+    try:
+        from . import blender3d  # commands only some copies of the engine carry
+    except ImportError:
+        pass
+    else:
+        blender3d.register(add)
     from . import stock
     p = add("stock", cmd_stock, "query", "dest")
     p.add_argument("--sources", nargs="*", choices=list(stock.ALL))

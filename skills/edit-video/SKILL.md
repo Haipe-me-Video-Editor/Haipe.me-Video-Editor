@@ -179,6 +179,17 @@ before `new` (it keeps audio, outputs 1080x1920). Leave edit.json `retouch` at 0
 clip, HQ + preview and a Gofile link each (public edition: the link with `--upload`). Studio voice is ~9 s per
 second of clip on CPU: a 30 s clip takes ~6 min.
 
+## Free music
+
+When the user has no track of their own (and no brand music), `python -m editor music-find "<mood or genre>" <dir>
+[--sources mixkit incompetech openverse ccmixter] [--n 3] [--min-dur 20]` downloads a few candidates from each free
+library: Mixkit (no credit needed), Incompetech (Kevin MacLeod) and CC0 / CC BY music through Openverse (Jamendo,
+ccMixter, Freesound, Wikimedia Commons) and ccMixter. Only licences a commercial video can use pass: non-commercial,
+no-derivatives and share-alike tracks are refused. Each file is recorded in `<dir>/credits.json`; `draft --music-dir
+<dir>` picks from the folder and carries a CC BY track's credit line to `out/credits.txt`: paste it into the post's
+caption. Prefer Mixkit and CC0 for ads and posts where a caption credit is awkward. Pick by mood, not by name: check
+the tempo and energy, start on a bar (`music.start`), and cut on the beat. A library that is down is skipped.
+
 ## Free stock footage
 
 `python -m editor stock "<query>" <dir> [--sources mixkit archive commons] [--portrait]` lists hits,
@@ -260,7 +271,7 @@ commercial use; never commit the models or sound files.
 
 ## Signature effects (fx pack)
 
-30 effects in `editor/fx/`, one module each, built in code on real footage (no AI pixels).
+36 effects in `editor/fx/`, one module each, built in code on real footage (no AI pixels).
 `python -m editor fx-list` prints every effect, its duration range, params and `BEST_FOR` tags (`any`, `finance`,
 `product`, `playful`, `corporate`). Put them in edit.json as
 `"fx": [{"type": "wall_text", "at": 4.2, "dur": 3, "text": "FOCUS"}]` (timeline seconds; windows can't overlap;
@@ -270,10 +281,17 @@ chart colours) lives in its style JSON (`data_look`, `cover_story`, `cover_name`
 
 When to use them (one effect every 8-15 s at most; each must land on a line that earns it):
 - **Section word / big claim:** `wall_text` (word behind the head), `glass_type` (frosted type), `headline_wall`.
-- **Announcement / "this is the story":** `cover_story`, `frame_break`.
+- **Announcement / "this is the story":** `cover_story`, `frame_break`, `news_bars` (breaking-news strips with
+  BREAKING / JUST IN tags slam in round the face; `items` are the headlines, from the script).
 - **Numbers (finance, data):** `chart_grow` (values only from the script, never invented), `list_tracker`.
 - **Steps, plans, "all you need":** `checklist`.
-- **Energy on a word:** `digital_zoom` (snap on the word), `vertigo`, `zoom_through` (between sections).
+- **Energy on a word:** `digital_zoom` (snap on the word), `vertigo`, `zoom_through` (between sections),
+  `shatter` (cracks from the face, the frame breaks into glass; `hit` on the word).
+- **"Look closer" / a detail:** `lens` (a ball of liquid glass settles on the face and magnifies it),
+  `viewfinder` (camera screen with REC and a focus box, punching in 1x > 1.8x > 3x > 1x), `portal` (a round
+  close-up pops up in a corner, then swallows the frame).
+- **Section change / a memory:** `photo_drop` (the shot becomes a tilted print dropped on a table, then swings
+  back).
 - **Opening / ending reveal:** `pull_back`.
 - **App or product moments:** `ui_world`, `orbit` (both hide captions while on).
 - **Playful brands only:** `paper_cut`, `doodle_boil`, `green_screen` (swap the background for stock).
@@ -351,8 +369,10 @@ and `transcript_timeline.md`.
   in body text. `at` ≥ 1.5, `dur` ≥ 2; no graphics or B-roll during a desk. The cutout runs on the CPU
   (about 0.5 s a frame), so keep desks to the explanation-heavy parts.
 - **Placement is automatic:** `analyze` writes `faces.json` and `render` puts every built-in card
-  in the free space off the speaker's head and the captions, inside the social safe zone (top 13%,
-  bottom 80%, right 12% kept clear for platform UI), shrinking it to fit. Free space is often a
+  in the free space off the speaker's head and the captions, inside the social safe zone, shrinking it to fit.
+  The zone is TikTok's, the tightest platform (`editor/safezone.py`, the one place it is set): the top 13%, the
+  bottom 25% (username, caption, sound) and the right 13% (the button column) stay clear. Effects, credits and a
+  card the user asks to enlarge (`scale`) obey it too. Free space is often a
   narrow band, so keep card text short (hook and quote ≤ 4–5 words, lists ≤ 3 short items) and
   fix every "cramped" note `render` prints by shortening the text or picking a compact type.
 - **Motion craft:** cubic easing, never linear. Start a graphic so its landing frame hits the

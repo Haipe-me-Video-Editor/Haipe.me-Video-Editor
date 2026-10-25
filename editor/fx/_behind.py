@@ -16,11 +16,12 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from .. import safezone
 from ..graphics.spring import PRESETS
 from ..graphics.spring import spring as _spring
 
 CELL = 8                      # occupancy grid cell, px
-SAFE = (0.04, 0.13, 0.88, 0.80)  # left, top, right, bottom of the 9:16 safe zone (fractions)
+SAFE = (safezone.X0, safezone.Y0, safezone.X1, safezone.Y1)  # left, top, right, bottom of the 9:16 safe zone
 
 
 # ---- time ------------------------------------------------------------------------------------------------------

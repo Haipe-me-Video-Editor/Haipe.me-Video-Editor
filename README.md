@@ -18,7 +18,8 @@ and checks its own work.
   a new visual on every phrase: screen recordings with a moving cursor, terminal and code cards, ranked lists).
 - **B-roll:** from your own library, or free stock (Mixkit, Internet Archive, Wikimedia Commons) with AI clips
   filtered out.
-- **Sound:** music ducked under speech, sound effects tied to what is on screen, studio voice restoration,
+- **Sound:** free music from Mixkit, Incompetech, Jamendo, ccMixter and more (commercial-safe licences only, credits
+  written for you), music ducked under speech, sound effects tied to what is on screen, studio voice restoration,
   -14 LUFS delivery.
 - **Look:** per-shot colour correction, face retouch, event recaps cut on the beat.
 - **Style picker:** reads the footage (shot size, movement, the room) and the talk (tools, money, a story, a

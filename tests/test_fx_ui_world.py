@@ -31,12 +31,13 @@ def test_panels_group_into_command_box_and_cards():
 @pytest.mark.parametrize("kind", ["close", "wide"])
 def test_layout_keeps_box_off_face_and_inside_safe_zone(kind):
     sc = scene(kind)
-    lay = u.layout(sc, u.split_panels(u.PARAMS["panels"]), 0.745, 1.0)
+    lay = u.fit_layout(sc, u.split_panels(u.PARAMS["panels"]), 0.745, 1.0)
     x0, y0, x1, y1 = lay["box"]
+    assert lay["k"] >= 0.7
     assert lay["box_plane"] == "front"
     assert y0 >= sc.chin  # under the chin: the face stays clear
     assert x0 >= sp.SAFE["x0"] * W - 1 and x1 <= sp.SAFE["x1"] * W + 1 and y1 <= sp.SAFE["y1"] * H
-    assert lay["word_y"] + 84 <= sp.SAFE["y1"] * H + 1
+    assert lay["word_y"] + 84 * lay["k"] <= sp.SAFE["y1"] * H + 1
     for c in lay["cards"]:
         r = c["rect"]
         assert r[1] >= sp.SAFE["y0"] * H - 1 and r[2] <= sp.SAFE["x1"] * W + 1

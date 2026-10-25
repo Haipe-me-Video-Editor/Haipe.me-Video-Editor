@@ -13,12 +13,14 @@ def _faces(y0, y1):
     return {"source": [1080, 1920], "samples": [{"t": t / 2, "box": [0.2, y0, 0.8, y1]} for t in range(20)]}
 
 
-def test_card_goes_below_the_captions_when_the_head_fills_the_top():
+def test_card_below_the_captions_never_enters_the_platform_ui():
+    # head fills the top and the captions sit low: the only gap left is a sliver above TikTok's caption block, so
+    # the card stays out of that block and is flagged as cramped instead of being pushed under the UI
     spec = {"type": "quote", "text": "We learn, we move on.", "at": 2.0, "dur": 2.0}
     slot = layout.place(spec, _plan(), _faces(0.05, 0.60), STYLE, SIZE)
     c0, c1 = layout.caption_band(STYLE, SIZE, "bilingual")
     assert slot["top"] >= c1 and slot["top"] + slot["height"] <= layout.SAFE_BOTTOM + 1e-9
-    assert layout.MIN_SCALE <= slot["scale"] < 1.0 and "note" not in slot  # two lines, shrunk to fit
+    assert layout.SAFE_BOTTOM <= 0.75 and "cramped" in slot["note"]
 
 
 def test_card_goes_above_a_low_head_and_stays_in_the_safe_zone():
