@@ -31,12 +31,12 @@ def test_graded_segments_carry_their_chain_into_the_filter():
     assert "GRADE,setsar=1" in ";".join(segments_filter(plan, {"a.mp4": 0}, (1080, 1920)))
 
 
-def test_grade_validation():
+def test_grade_is_refused_footage_colour_never_changes():
     p = editjson.new_plan([{"src": "raw/a.mp4", "in": 0.0, "out": 2.0}])
-    p["grade"] = {"look": "punchy"}
     assert editjson.validate(p) == []
-    p["grade"] = {"look": "neon"}
-    assert any("grade" in e for e in editjson.validate(p))
+    for g in ({"look": "punchy"}, {"look": "clean"}, {"curves": {"r": [[0, 0], [255, 240]]}}):
+        p["grade"] = g
+        assert any("colour never changes" in e for e in editjson.validate(p))
 
 
 def test_white_wall_lands_on_neutral_with_coloured_objects_around():

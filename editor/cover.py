@@ -419,7 +419,7 @@ def compose(layout: str, size_name: str, person: tuple, frame_rgb, title: str, a
         bg = _gradient(W, H, _shade(pal["bg1"], 0.55), _shade(pal["bg1"], 0.9))
     else:
         bg = _gradient(W, H, pal["bg1"], pal["bg2"], (cx, H * 0.45, max(W, H) * 0.45))
-    layer, pbox = _place_person(_mono(rgb) if layout == "minimal" else rgb, alpha, W, H, face_frac, cx, snap=wide)
+    layer, pbox = _place_person(rgb, alpha, W, H, face_frac, cx, snap=wide)  # the speaker keeps their colour
     cut = cut_sides(np.asarray(layer.getchannel("A")).astype(np.float32) / 255)
     if layout == "minimal":
         layer = _feather_cuts(layer, cut)
@@ -489,12 +489,6 @@ def _cover_fit(frame, W, H):
     h, w = frame.shape[:2]
     s = max(W / w, H / h)
     return int(w * s) + 1, int(h * s) + 1
-
-
-def _mono(rgb):
-    y = (rgb[..., 0] * 0.299 + rgb[..., 1] * 0.587 + rgb[..., 2] * 0.114)
-    y = np.clip((y - 128) * 1.2 + 128, 0, 255).astype(np.uint8)
-    return np.dstack([y, y, y])
 
 
 # ---- checks ----------------------------------------------------------------------------------------------------

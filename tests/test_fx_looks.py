@@ -120,8 +120,7 @@ def test_glitch_weak_edges_of_the_window_on_a_full_size_frame():
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("spec", [{"type": "film_look", "leak": True}, {"type": "beat_shake", "hits": [0.1, 0.5]},
-                                  {"type": "glitch", "mosh": True}])
+@pytest.mark.parametrize("spec", [{"type": "beat_shake", "hits": [0.1, 0.5]}])  # the colour looks are refused
 def test_frame_only_looks_render_the_exact_window(tmp_path, spec):
     src = tmp_path / "src.mp4"
     subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=216x384:r=30:d=2", "-pix_fmt",

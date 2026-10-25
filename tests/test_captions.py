@@ -212,6 +212,13 @@ def test_timeline_words_carry_br_and_glue():
     assert tw[0].get("br") and tw[1].get("glue") and "glue" not in tw[0]
 
 
+def test_soft_halo_and_plain_white_active_word(words):
+    style = {**STYLE, "caption_blur": 6, "caption_active": {"fill": "#FFFFFF"}}
+    lines = captions.build_lines(SEGS, words, style, SIZE)
+    ass = captions.to_ass(lines, style, SIZE)
+    assert "{\\blur6}" in ass and "\\1c&HFFFFFF&" in ass
+
+
 def test_caption_colours_land_on_the_true_colour_after_libass_bt601():
     """libass converts with BT.601; the colour written must come out as the true colour's BT.709 YUV."""
     from editor.captions import _bgr

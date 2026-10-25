@@ -62,3 +62,46 @@ def test_unknown_family_names_the_supported_ones(tmp_path, monkeypatch):
     monkeypatch.setattr(fonts, "FONT_CACHE", tmp_path)
     with pytest.raises(ValueError, match="Tajawal"):
         ensure_font("Comic Sans")
+
+
+def test_a_font_is_named_after_its_family_for_libass(tmp_path):
+    # Google's Almarai-Bold.ttf names itself "Almarai Bold" / "Regular" in the Windows table: libass could not find
+    # "Almarai" by name and drew the captions in a fallback face.
+    from fontTools.ttLib.tables._n_a_m_e import table__n_a_m_e
+    font = TTFont()
+    font["name"] = table__n_a_m_e()
+    font["name"].names = []
+    font["name"].setName("Almarai Bold", 1, 3, 1, 0x409)
+    font["name"].setName("Regular", 2, 3, 1, 0x409)
+    font["name"].setName("Almarai", 16, 3, 1, 0x409)
+    fonts._name_as(font, "Almarai")
+    n = font["name"]
+    assert str(n.getName(1, 3, 1, 0x409)) == "Almarai" and str(n.getName(2, 3, 1, 0x409)) == "Bold"
+    assert n.getName(16, 3, 1, 0x409) is None and str(n.getName(1, 1, 0, 0)) == "Almarai"
+
+
+def test_narrow_scales_outlines_advances_and_mark_anchors():
+    # the narrowed highlight face: every horizontal measure shrinks, so Arabic dots stay on their letters
+    from fontTools.fontBuilder import FontBuilder
+    from fontTools.pens.ttGlyphPen import TTGlyphPen
+    from fontTools.ttLib.tables import otTables
+    pen = TTGlyphPen(None)
+    pen.moveTo((100, 0)), pen.lineTo((100, 500)), pen.lineTo((500, 500)), pen.lineTo((500, 0)), pen.closePath()
+    fb = FontBuilder(1000, isTTF=True)
+    fb.setupGlyphOrder([".notdef", "a"])
+    fb.setupCharacterMap({0x61: "a"})
+    fb.setupGlyf({".notdef": TTGlyphPen(None).glyph(), "a": pen.glyph()})
+    fb.setupHorizontalMetrics({".notdef": (500, 0), "a": (600, 100)})
+    fb.setupHorizontalHeader()
+    font = fb.font
+    anchor = otTables.Anchor()
+    anchor.Format, anchor.XCoordinate, anchor.YCoordinate = 1, 300, 700
+    gpos = type("T", (), {})()
+    gpos.table = type("L", (), {})()
+    gpos.table.anchors = [anchor]
+    font.tables["GPOS"] = gpos
+    fonts._narrow(font, 0.5)
+    assert font["hmtx"]["a"] == (300, 50)
+    assert min(x for x, _ in font["glyf"]["a"].coordinates) == 50
+    assert max(x for x, _ in font["glyf"]["a"].coordinates) == 250
+    assert (anchor.XCoordinate, anchor.YCoordinate) == (150, 700)

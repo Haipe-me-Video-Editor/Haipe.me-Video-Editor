@@ -10,6 +10,26 @@ from .core import Ctx, spec_key
 
 COMMON = ("type", "at", "dur", "note", "captions")  # captions: keep | hide (default: the effect's CAPTIONS)
 
+# House rule (2026-10-25): the footage keeps its camera colour on every edit, under any condition. Effects
+# whose point is to recolour it are refused; the others are held to their colour-true options.
+RECOLOURS = {"film_look": "a warm film grade", "color_pop": "the room in black and white or tinted",
+             "noir_minimal": "the speaker in black and white", "glitch": "an RGB split over the footage"}
+COLOUR_TRUE = {"freeze_callout": ("bg", {"blur"}), "outline": ("bg", {"keep", "blur"}),
+               "motion_echo": ("color", {None}), "beat_shake": ("split", {False}), "lens": ("fringe", {0, 0.0})}
+
+
+def colour_errors(spec: dict, i: int) -> list:
+    """Why an effect would change the footage's colour ([] when it keeps it)."""
+    t = spec.get("type")
+    if t in RECOLOURS:
+        return [f"fx[{i}] {t}: refused, it changes the footage's colour ({RECOLOURS[t]}); footage colour never changes"]
+    if t in COLOUR_TRUE:
+        key, ok = COLOUR_TRUE[t]
+        value = spec.get(key, registry()[t].PARAMS.get(key) if t in registry() else None)
+        if value not in ok:
+            return [f"fx[{i}] {t}: {key} {value!r} changes the footage's colour; use {sorted(ok, key=str)}"]
+    return []
+
 
 def hides_captions(spec: dict) -> bool:
     """Whether burned captions should be left out during this window (effects that fill the caption band)."""
@@ -22,6 +42,7 @@ def check(fx: list, total: float | None = None) -> list:
     reg, errs = registry(), []
     prev_end, prev = -1.0, None
     for i, f in enumerate(sorted(fx, key=lambda x: x.get("at", 0))):
+        errs += colour_errors(f, i)
         t = f.get("type")
         if t not in reg:
             errs.append(f"fx[{i}]: unknown type {t!r}; one of {sorted(reg)}")

@@ -475,3 +475,9 @@ def test_split_broll_may_open_the_video_and_checks_its_fields():
     assert any("frame must be one of" in e for e in editjson.validate(p))
     p["broll"][-1].update(frame="top", split_y=0.8)
     assert any("split_y" in e for e in editjson.validate(p))
+
+
+def test_segments_hash_ignores_render_time_fields():
+    p = editjson.new_plan([{"src": "a.mp4", "in": 0, "out": 5}])
+    graded = {**p, "segments": [{**p["segments"][0], "_grade": "curves=..."}]}
+    assert editjson.segments_hash(p) == editjson.segments_hash(graded)

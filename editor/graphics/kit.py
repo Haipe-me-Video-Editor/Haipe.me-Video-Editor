@@ -17,7 +17,7 @@ import json
 from .spring import SPRING_TAG, spring_in
 
 KIT_TYPES = ("stack", "card", "badge", "bars", "leak", "endcard", "tiles", "poll", "balance", "wave", "mark",
-             "sticker", "title")
+             "sticker", "title", "flag")
 
 # Fonts each kit composition can use; render.py copies these files next to index.html.
 KIT_FONTS = {"ar": "Tajawal Medium", "arb": "Tajawal", "arh": "Lalezar", "hero": "Anton", "latin": "Montserrat",
@@ -40,6 +40,8 @@ ICONS = {
     "plane": '<path d="M46 10c4 0 6 4 6 8v22l34 18v9l-34-9v19l10 7v7l-16-5-16 5v-7l10-7V58l-34 9v-9l34-18V18c0-4 2-8 6-8z" fill="#fff"/>',
     "box": '<path d="M50 10l38 18v44L50 90 12 72V28zM12 28l38 18 38-18M50 46v44" fill="none" stroke="#fff" stroke-width="7" stroke-linejoin="round"/>',
     "news": '<rect x="10" y="18" width="80" height="64" rx="8" fill="none" stroke="#fff" stroke-width="7"/><path d="M22 34h56M22 50h26M22 64h26M58 50h20v14H58z" stroke="#fff" stroke-width="6" fill="none"/>',
+    "file": '<path d="M24 8h36l22 22v62H24z" fill="currentColor"/><path d="M60 8v22h22z" fill="#fff" opacity=".45"/>'
+            '<path d="M36 52h32M36 64h32M36 76h20" stroke="#fff" stroke-width="5" stroke-linecap="round"/>',
     "bell": '<path d="M50 14a8 8 0 0 1 8 8v3c12 4 20 15 20 28v14l8 10H14l8-10V53c0-13 8-24 20-28v-3a8 8 0 0 1 8-8zM40 82h20a10 10 0 0 1-20 0z" fill="#fff"/>',
 }
 
@@ -117,6 +119,15 @@ def _line_css(line: dict, c: dict, u: float) -> tuple[str, str]:
         css.append(f"text-shadow:0 0 {14 * u:.0f}px rgba(255,255,255,.35),0 {3 * u:.0f}px {14 * u:.0f}px rgba(0,0,0,.45)")
     if line.get("pill"):
         cls += " pill"
+    elif line.get("box"):  # a tag: the text on a block of the accent (or the colour given) with a soft glow
+        fill = c["accent"] if line["box"] is True else c.get(line["box"], line["box"])
+        glow = c.get(f"{line['box']}_glow", "rgba(255,255,255,.35)") if isinstance(line["box"], str) else f"{fill}99"
+        css = [x for x in css if not x.startswith(("background-image", "filter", "color", "text-shadow"))]
+        cls = "ln"
+        css += [f"color:{c['ink']}", f"background:{fill}", f"padding:{.06 * size:.0f}px {.22 * size:.0f}px {.1 * size:.0f}px",
+                f"border-radius:{c.get('tag_radius', .08) if not isinstance(line['box'], str) else c.get(line['box'] + '_radius', .08)}em",
+                f"box-shadow:0 0 {26 * u:.0f}px {glow}",
+                f"text-shadow:0 0 {8 * u:.0f}px rgba(255,255,255,.75),0 0 {22 * u:.0f}px rgba(200,170,255,.6)"]
     if line.get("tracking") is not None:
         css.append(f"letter-spacing:{line['tracking'] * u:.1f}px")
     return cls, ";".join(css)
@@ -165,6 +176,12 @@ def _enter(sel: str, t: float, anim: str, u: float) -> str:
     if anim == "pop":
         return spring_in(sel, f'scale:.55,opacity:0,filter:"blur({10 * u:.0f}px)"',
                          'scale:1,opacity:1,filter:"blur(0px)",duration:.4', "bouncy", t)
+    if anim == "type":  # typed on: revealed left to right (a tag's block grows with its text)
+        return (f'tl.fromTo("{sel}",{{clipPath:"inset(-20% 100% -20% 0%)",opacity:1}},'
+                f'{{clipPath:"inset(-20% 0% -20% 0%)",duration:.5,ease:"steps(10)"}},{t:.3f});')
+    if anim == "stretch":  # a kashida title opening out from its centre
+        return spring_in(sel, f'scaleX:.45,opacity:0,filter:"blur({12 * u:.0f}px)"',
+                         'scaleX:1,opacity:1,filter:"blur(0px)",duration:.5', "gentle", t)
     return spring_in(sel, f'y:{70 * u:.0f},opacity:0,filter:"blur({16 * u:.0f}px)"',
                      'y:0,opacity:1,filter:"blur(0px)",duration:.45', "gentle", t)
 
@@ -189,9 +206,14 @@ def _stack(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
         txt = str(line["text"])
         rtl = rtl or any("؀" <= ch <= "ۿ" for ch in txt)
         dx = line.get("dx", 0) * u
+        if line.get("opacity") is not None:
+            css += f";opacity:{line['opacity']}"
+        inner = (f'<svg viewBox="0 0 100 100" style="width:{line.get("size", 60) * u:.0f}px;height:{line.get("size", 60) * u:.0f}px;'
+                 f'color:{c.get(line.get("color"), line.get("color", c["ink"]))};filter:drop-shadow(0 0 {10 * u:.0f}px currentColor)">'
+                 f'{ICONS[line["icon"]]}</svg>' if line.get("icon")
+                 else f'<span class="{cls}" style="{css}" dir="auto">{_e(txt)}</span>')
         items.append(f'<div class="row" style="text-align:{line.get("align", align)};transform:translateX({dx:.0f}px)">'
-                     f'<span id="l{i}" class="lw" style="display:inline-block"><span class="{cls}" style="{css}" dir="auto">'
-                     f'{_e(txt)}</span></span></div>')
+                     f'<span id="l{i}" class="lw" style="display:inline-block">{inner}</span></div>')
         script.append(_enter(f"#l{i}", line.get("t", 0.0), line.get("anim", "rise"), u))
         if line.get("strike") is not None:
             items[-1] = items[-1].replace('</span></span></div>', f'</span><i id="k{i}" class="strike"></i></span></div>')
@@ -205,7 +227,8 @@ def _stack(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
                        "sy": f"{6 * u:.0f}", "sb": f"{24 * u:.0f}"}
            + f".lw{{position:relative}}.strike{{position:absolute;left:-4%;right:-4%;top:52%;height:{14 * u:.0f}px;border-radius:{8 * u:.0f}px;"
              f"background:{c['accent']};box-shadow:0 0 {24 * u:.0f}px {c['accent']};transform-origin:right center}}"
-           + f"#st{{position:absolute;left:{x * 100:.2f}%;top:{y * 100:.2f}%;transform:translate({anchor},-50%);"
+           + f"#st{{position:absolute;left:{x * 100:.2f}%;top:{y * 100:.2f}%;"
+             f"transform:translate({anchor},-50%) rotate({spec.get('rotate', 0)}deg);"
              f"display:flex;flex-direction:column;gap:{gap:.0f}px;min-width:max-content}}")
     if style.get("pill_bg"):  # the brand's own glass for pills (fill, hairline, corner)
         css += (f".pill{{background:{style['pill_bg']};border-color:{style.get('pill_border', 'rgba(255,255,255,.42)')};"
@@ -302,6 +325,7 @@ def _badge(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
     x, y = spec.get("pos", [0.5, 0.5])
     s = spec.get("size", 300) * u
     icon = ICONS[spec.get("icon", "comment")]
+    num = spec.get("num")  # a numbered step: the figure in the diamond instead of an icon
     pill = ""
     script = [spring_in("#dia", f'scale:.5,opacity:0,filter:"blur({12 * u:.0f}px)"',
                         'scale:1,opacity:1,filter:"blur(0px)",duration:.45', "bouncy", 0),
@@ -315,13 +339,19 @@ def _badge(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
     css = (BASE_CSS % {"g": "16", "py": f"{14 * u:.0f}", "px": f"{54 * u:.0f}", "bw": f"{1.6 * u:.1f}", "sy": "6", "sb": "24"}
            + f"#wrap{{position:absolute;left:{x * 100:.2f}%;top:{y * 100:.2f}%;width:0;height:0}}"
            f"#dia{{position:absolute;left:{-s / 2:.0f}px;top:{-s / 2:.0f}px;width:{s:.0f}px;height:{s:.0f}px}}"
-           f"#sq{{position:absolute;inset:{s * 0.15:.0f}px;border-radius:{s * 0.1:.0f}px;transform:rotate(45deg);"
-           f"background:linear-gradient(135deg,{c['light']} 0%,{c['accent']} 45%,{c['deep']} 100%);"
-           f"box-shadow:0 0 {60 * u:.0f}px {c['accent']}e6,0 0 {140 * u:.0f}px {c['accent']}80,inset 0 0 {30 * u:.0f}px #ffffff55}}"
-           f"#ico{{position:absolute;left:{s * 0.27:.0f}px;top:{s * 0.27:.0f}px;width:{s * 0.46:.0f}px;height:{s * 0.46:.0f}px;"
+           f"#sq{{position:absolute;inset:{s * 0.15:.0f}px;border-radius:{s * spec.get('radius', 0.1):.0f}px;transform:rotate(45deg);"
+           + (f"background:radial-gradient(circle at 50% 50%,{c['pale']}f2 0%,{c['light']}d9 45%,{c['neon']}a6 100%);"
+              f"border:{2 * u:.1f}px solid #ffffffb3;"
+              f"box-shadow:0 0 {50 * u:.0f}px {c['neon']},0 0 {120 * u:.0f}px {c['neon']}aa,inset 0 0 {24 * u:.0f}px #ffffff88}}"
+              if spec.get("look") == "glow" else
+              f"background:linear-gradient(135deg,{c['light']} 0%,{c['accent']} 45%,{c['deep']} 100%);"
+              f"box-shadow:0 0 {60 * u:.0f}px {c['accent']}e6,0 0 {140 * u:.0f}px {c['accent']}80,inset 0 0 {30 * u:.0f}px #ffffff55}}")
+           + f"#ico{{position:absolute;left:{s * 0.27:.0f}px;top:{s * 0.27:.0f}px;width:{s * 0.46:.0f}px;height:{s * 0.46:.0f}px;"
            f"filter:drop-shadow(0 0 {14 * u:.0f}px #fff)}}")
-    body = (f'<div id="wrap"><div id="dia"><div id="sq"></div><svg id="ico" viewBox="0 0 100 100">{icon}</svg></div>'
-            f'{pill}</div>')
+    glyph = (f'<div id="ico" style="left:0;top:0;width:{s:.0f}px;height:{s:.0f}px;display:flex;align-items:center;'
+             f'justify-content:center;color:#fff;font-family:K{spec.get("num_font", "latin")};font-size:{s * 0.36:.0f}px;'
+             f'line-height:1">{_e(num)}</div>' if num is not None else f'<svg id="ico" viewBox="0 0 100 100">{icon}</svg>')
+    body = f'<div id="wrap"><div id="dia"><div id="sq"></div>{glyph}</div>{pill}</div>'
     return _doc(size, d, css, body, "\n  ".join(script), font_files, True)
 
 
@@ -445,11 +475,27 @@ def _endcard(spec: dict, style: dict, size: tuple, font_files: dict, logo: str |
     css = (BASE_CSS % {"g": "16", "py": "14", "px": "54", "bw": "1.6", "sy": "6", "sb": "24"}
            + "#wb{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center}"
            + "#veil{position:absolute;inset:0;background:#4a4a4a;opacity:0}")
-    script = ['tl.fromTo("#wb",{backgroundColor:"#000000"},{backgroundColor:"#3c3c3c",duration:.12,ease:"none"},.1);',
-              'tl.to("#wb",{backgroundColor:"#ffffff",duration:.55,ease:"power2.out"},.22);',
-              spring_in("#logo", "opacity:0,scale:.96", "opacity:1,scale:1,duration:.55", "gentle", .22),
-              'tl.to("#logo",{scale:1.02,duration:%.2f,ease:"sine.out"},.77);' % max(d - 1.1, 0.3),
-              'tl.fromTo("#veil",{opacity:0},{opacity:.8,duration:.85,ease:"power1.in"},%.2f);' % (d - 0.9)]
+    if spec.get("slide"):  # a white panel sweeps in from the left over the last shot, the logo blurs in on it
+        css += (f"#wb{{background:transparent}}#pn{{position:absolute;inset:0;background:#fff;box-shadow:{60 * u:.0f}px 0 {50 * u:.0f}px #fff}}#logo{{position:relative}}")
+        lockup = '<div id="pn"></div>' + lockup
+        script = [f'tl.fromTo("#pn",{{xPercent:-120}},{{xPercent:0,duration:{spec.get("slide", .45)},ease:"power2.inOut"}},0);',
+                  'tl.fromTo("#logo",{opacity:0,filter:"blur(%.0fpx)"},{opacity:1,filter:"blur(0px)",duration:.55,'
+                  'ease:"power2.out"},.25);' % (10 * u)]
+    elif spec.get("from_white"):  # entered through a light burn: the flare's white is already the card
+        script = ['tl.set("#wb",{backgroundColor:"#ffffff"},0);',
+                  'tl.fromTo("#logo",{opacity:0,filter:"blur(%.0fpx)"},{opacity:1,filter:"blur(0px)",duration:.55,'
+                  'ease:"power2.out"},.2);' % (10 * u)]
+    else:
+        script = ['tl.fromTo("#wb",{backgroundColor:"#000000"},{backgroundColor:"#3c3c3c",duration:.12,ease:"none"},.1);',
+                  'tl.to("#wb",{backgroundColor:"#ffffff",duration:.55,ease:"power2.out"},.22);',
+                  spring_in("#logo", "opacity:0,scale:.96", "opacity:1,scale:1,duration:.55", "gentle", .22),
+                  'tl.to("#logo",{scale:1.02,duration:%.2f,ease:"sine.out"},.77);' % max(d - 1.1, 0.3)]
+    fade = spec.get("fade", 0.9)  # the closing veil: grey by default, black with fade_to
+    css = css.replace("#veil{position:absolute;inset:0;background:#4a4a4a",
+                      f"#veil{{position:absolute;inset:0;background:{spec.get('fade_to', '#4a4a4a')}")
+    script.append('tl.fromTo("#veil",{opacity:0},{opacity:%s,duration:%.2f,ease:"%s"},%.2f);'  # to a colour: linear
+                  % (1 if spec.get("fade_to") else .8, fade - 0.05, "none" if spec.get("fade_to") else "power1.in",
+                     d - fade))
     return _doc(size, d, css, f'<div id="wb">{lockup}</div><div id="veil"></div>', "\n  ".join(script),
                 font_files, False)
 
@@ -855,12 +901,87 @@ def _title(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
     return _doc(size, d, css, body, "\n  ".join(script), font_files, arabic)
 
 
+def _glow_card(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
+    """Full-screen purple light (bright in one corner, deep violet across, near-black in the other) with a statement
+    in white. A `scroll` line runs across the frame left to right (the end of an Arabic sentence arrives last), then
+    settles small in the middle at `settle`; `sub` lines blur in under it."""
+    W, H = size
+    u = W / 1080
+    c = _colors(style)
+    d = spec["dur"]
+    y = spec.get("y", 0.47)
+    css = (BASE_CSS % {"g": "16", "py": "14", "px": "54", "bw": "1.6", "sy": "6", "sb": "24"}
+           + f"#gbg{{position:absolute;inset:-10%;background:radial-gradient(60% 45% at 100% 0%,{c['light']} 0%,{c['accent']}00 100%),"
+           f"radial-gradient(70% 55% at 0% 100%,{c['accent']}cc 0%,{c['accent']}00 100%),"
+           f"radial-gradient(80% 60% at 75% 70%,{c['night']} 0%,{c['night']}00 100%),"
+           f"linear-gradient(160deg,{c['neon']} 0%,{c['bevel2']} 45%,{c['bevel1']} 100%)}}"
+           f".gl{{position:absolute;left:0;width:100%;text-align:center;white-space:nowrap;color:#fff;"
+           f"text-shadow:0 0 {10 * u:.0f}px rgba(255,255,255,.65),0 0 {28 * u:.0f}px {c['light']}aa}}"
+           f"#gm{{top:{y * 100:.1f}%;transform:translateY(-50%)}}#gm span{{display:inline-block}}")
+    bi = spec.get("bg_in", .12)  # 0: the card is simply there (entered under a light burn's white)
+    rows, script = [], ['tl.set("#gbg",{opacity:1},0);' if bi <= 0 else f'tl.fromTo("#gbg",{{opacity:0}},{{opacity:1,duration:{bi}}},0);',
+                        f'tl.fromTo("#gbg",{{x:0,y:0}},{{x:{-40 * u:.0f},y:{30 * u:.0f},duration:{d:.2f},ease:"none"}},0);']
+    for i, ln in enumerate(spec["lines"]):
+        fs = ln.get("size", 64) * u
+        font = ln.get("font", "alm")
+        if ln.get("scroll"):  # starts with its first word near the right edge, ends with its last near the left
+            a, b = ln["scroll"]
+            rows.append(f'<div class="gl" id="gm"><span id="g{i}" dir="rtl" style="font-family:K{font};font-size:{fs:.0f}px">'
+                        f'{_e(ln["text"])}</span></div>')
+            script.append(f'tl.fromTo("#g{i}",{{opacity:0,filter:"blur({10 * u:.0f}px)"}},{{opacity:1,filter:"blur(0px)",duration:.3}},{a:.2f});')
+            script.append(f'tl.fromTo("#g{i}",{{x:()=>{W * 0.4:.0f}-document.getElementById("g{i}").offsetWidth/2}},'
+                          f'{{x:()=>document.getElementById("g{i}").offsetWidth/2-{W * 0.4:.0f},duration:{b - a:.2f},ease:"none"}},{a:.2f});')
+            if ln.get("settle") is not None:
+                s = ln["settle"]
+                script.append(f'tl.to("#g{i}",{{x:0,scale:{ln.get("settle_scale", .62)},duration:.25,ease:"power2.out"}},{s:.2f});')
+        else:
+            top = ln.get("y", y + 0.045)
+            rows.append(f'<div class="gl" style="top:{top * 100:.1f}%;transform:translateY(-50%)"><span id="g{i}" dir="auto" '
+                        f'style="display:inline-block;font-family:K{font};font-size:{fs:.0f}px">{_e(ln["text"])}</span></div>')
+            script.append(spring_in(f"#g{i}", f'opacity:0,filter:"blur({14 * u:.0f}px)",y:{16 * u:.0f}',
+                                    'opacity:1,filter:"blur(0px)",y:0,duration:.45', "gentle", ln.get("t", .3)))
+    return _doc(size, d, css, f'<div id="gbg"></div>{"".join(rows)}', "\n  ".join(script), font_files, True)
+
+
+def _flag(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
+    """A waving cloth flag drawn on a canvas in vertical strips (a travelling sine wave lifts and shades each one),
+    tilted and slid in from the frame edge. design: 'jp' (white, red disc)."""
+    W, H = size
+    u = W / 1080
+    d = spec["dur"]
+    x, y = spec.get("pos", [0.2, 0.2])
+    fw = spec.get("w", 0.36) * W
+    fh = fw * 2 / 3
+    pad = fh * 0.25
+    css = (BASE_CSS % {"g": "16", "py": "14", "px": "54", "bw": "1.6", "sy": "6", "sb": "24"}
+           + f"#fw{{position:absolute;left:{x * 100:.2f}%;top:{y * 100:.2f}%;transform:translate(-50%,-50%) rotate({spec.get('rotate', -14)}deg)}}"
+           f"#fc{{display:block;filter:drop-shadow(0 {10 * u:.0f}px {18 * u:.0f}px rgba(0,0,0,.45))}}")
+    cw, ch = round(fw + pad * 2), round(fh + pad * 2)
+    script = f"""
+  const cv=document.getElementById("fc"),cx=cv.getContext("2d"),st={{p:0}};
+  const src=document.createElement("canvas");src.width={round(fw)};src.height={round(fh)};
+  const sx=src.getContext("2d");sx.fillStyle="#f4f4f6";sx.fillRect(0,0,src.width,src.height);
+  sx.fillStyle="#c8102e";sx.beginPath();sx.arc(src.width/2,src.height/2,src.height*0.3,0,Math.PI*2);sx.fill();
+  function draw(){{cx.clearRect(0,0,{cw},{ch});const n=60,sw=src.width/n;
+    for(let i=0;i<n;i++){{const k=i/n,ph=st.p*6.0-k*7.0,amp={fh * 0.09:.1f}*k,dy=Math.sin(ph)*amp,sh=Math.cos(ph)*k;
+      cx.drawImage(src,i*sw,0,sw+1,src.height,{pad:.1f}+i*sw,{pad:.1f}+dy,sw+1,src.height);
+      cx.fillStyle=sh>0?"rgba(255,255,255,"+(sh*0.22).toFixed(3)+")":"rgba(0,0,0,"+(-sh*0.35).toFixed(3)+")";
+      cx.fillRect({pad:.1f}+i*sw,{pad:.1f}+dy,sw+1,src.height);}}}}
+  tl.to(st,{{p:{d:.2f},duration:{d:.2f},ease:"none",onUpdate:draw}},0);draw();
+  tl.fromTo("#fm",{{xPercent:-70,opacity:0}},{{xPercent:0,opacity:1,duration:.45,ease:"power3.out"}},0);
+  tl.to("#fm",{{xPercent:-90,opacity:0,duration:.3,ease:"power2.in"}},{max(d - .3, .1):.2f});"""
+    return _doc(size, d, css, f'<div id="fw"><div id="fm"><canvas id="fc" width="{cw}" height="{ch}"></canvas></div></div>', script,
+                font_files, False)
+
+
 def kit_html(spec: dict, style: dict, size: tuple, font_files: dict, logo: str | None = None) -> str:
     t = spec["type"]
     if t == "stack":
         return _stack(spec, style, size, font_files)
     if t == "card":
-        return _card(spec, style, size, font_files)
+        return (_glow_card if spec.get("look") == "glow" else _card)(spec, style, size, font_files)
+    if t == "flag":
+        return _flag(spec, style, size, font_files)
     if t == "badge":
         return _badge(spec, style, size, font_files)
     if t == "bars":

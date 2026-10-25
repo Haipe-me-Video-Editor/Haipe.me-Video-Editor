@@ -192,10 +192,12 @@ def to_ass(lines: list, style: dict, size: tuple, mode: str = "source", desks: l
     sizes = _sizes(style, size)
     lift = round((1 - DESK_CAPTION_BOTTOM) * H) - sizes["Cap"][1]
 
+    soft = f"{{\\blur{style['caption_blur']}}}" if style.get("caption_blur") else ""  # a soft halo, not a hard edge
+
     def event(start, end, style_name, text):
         on_desk = any(d["at"] - 0.01 <= start < d["at"] + d["dur"] for d in desks)
         mv = sizes[style_name[:-1]][1] + lift if on_desk else 0
-        out.append(f"Dialogue: 0,{_t(start)},{_t(end)},{style_name},,0,0,{mv},,{text}")
+        out.append(f"Dialogue: 0,{_t(start)},{_t(end)},{style_name},,0,0,{mv},,{soft}{text}")
 
     for ln in lines:
         src_text = " ".join(w["w"] for w in ln["words"])
