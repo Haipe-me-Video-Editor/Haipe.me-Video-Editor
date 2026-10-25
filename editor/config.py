@@ -10,6 +10,10 @@ BRANDS_DIR = Path(os.environ.get("EDITOR_BRANDS", PACKAGE_DIR.parent / "brands")
 FONT_CACHE = Path(os.environ.get("EDITOR_FONT_CACHE", Path.home() / ".cache" / "claude-video-editor" / "fonts"))
 
 FPS = 30
+# Every RGB layer (graphics, overlays, cut-outs) goes to YUV with the BT.709 matrix before it is laid on the picture.
+# Left to ffmpeg, the conversion uses BT.601 (a deep plum came out visibly off its colour), and an RGBA overlay with
+# format=auto turns the whole picture to RGB, which clips saturated footage (a violet wall went lighter and greyer).
+TO_YUV = "scale=out_color_matrix=bt709:out_range=tv,format=yuva420p"
 FORMATS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080)}
 
 

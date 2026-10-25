@@ -64,5 +64,6 @@ def test_video_filter_lays_the_cutout_over_the_desk():
     plan = _plan([])
     pl = {"w": 640, "h": 1136, "x": 220, "y": 1040}
     vf = video_filter(plan, {"raw/a.mp4": 0}, [], [], SIZE, desk_inputs=[({"at": 2.0, "dur": 4.0}, 1, 2, pl)])
-    assert "[1:v]setpts=PTS-STARTPTS+2.0/TB[dk0]" in vf and "scale=640:1136[fg0]" in vf
+    assert "[1:v]setpts=PTS-STARTPTS+2.0/TB,scale=out_color_matrix=bt709:out_range=tv,format=yuva420p[dk0]" in vf \
+           and "scale=640:1136,scale=out_color_matrix=bt709:out_range=tv,format=yuva420p[fg0]" in vf
     assert "overlay=x=220:y=1040:enable='between(t,2.0,6.0)'" in vf

@@ -131,8 +131,17 @@ def _t(t: float) -> str:
 
 
 def _bgr(hex_rgb: str) -> str:
+    """An ASS colour (BBGGRR) that lands on the true colour. libass in ffmpeg converts subtitle colours to YUV with
+    BT.601 whatever the video is tagged, and the videos are BT.709 (a deep plum came out visibly off its colour), so
+    the colour written is the one whose BT.601 YUV is the true colour's BT.709 YUV."""
     h = hex_rgb.lstrip("#")
-    return f"{h[4:6]}{h[2:4]}{h[0:2]}".upper()
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    y = 0.2126 * r + 0.7152 * g + 0.0722 * b                                   # BT.709
+    cb, cr = (b - y) / 1.8556, (r - y) / 1.5748
+    r2, b2 = y + 1.402 * cr, y + 1.772 * cb                                   # read back with BT.601
+    g2 = (y - 0.299 * r2 - 0.114 * b2) / 0.587
+    r, g, b = (max(0, min(255, round(v * 255))) for v in (r2, g2, b2))
+    return f"{b:02X}{g:02X}{r:02X}"
 
 
 def _esc(text: str) -> str:

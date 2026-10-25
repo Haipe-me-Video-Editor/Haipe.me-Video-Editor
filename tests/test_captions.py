@@ -28,7 +28,7 @@ def test_source_mode_one_event_per_word_with_highlight_and_rtl_safe_encoding(wor
     lines = captions.build_lines(SEGS, words, STYLE, SIZE)
     ass = captions.to_ass(lines, STYLE, SIZE)
     assert "PlayResX: 1080" in ass and ass.count("Dialogue:") == 4
-    assert r"{\1c&H1A7AFF&}" in ass
+    assert r"{\1c&H1F72F3&}" in ass
     assert all(ln.endswith(",-1") for ln in ass.splitlines() if ln.startswith("Style:"))
     assert r"\kf" not in ass
 
@@ -124,8 +124,8 @@ def test_highlight_moves_one_word_per_event():
     events = [e for e in captions.to_ass(ln, STYLE, SIZE).splitlines() if e.startswith("Dialogue:")]
     assert len(events) == 3
     for k, word in enumerate(["alpha", "beta", "gamma"]):
-        assert f"{{\\1c&H1A7AFF&}}{word}{{" in events[k]
-        assert events[k].count("&H1A7AFF&") == 1
+        assert f"{{\\1c&H1F72F3&}}{word}{{" in events[k]
+        assert events[k].count("&H1F72F3&") == 1
 
 
 def test_layout_check_flags_a_caption_below_the_safe_area():
@@ -210,3 +210,16 @@ def test_timeline_words_carry_br_and_glue():
     tw = captions.timeline_words([{"in": 0.0, "out": 2.0}], [{"w": "a", "start": 0.1, "end": 0.3, "br": True},
                                                              {"w": "b", "start": 0.4, "end": 0.6, "glue": True}])
     assert tw[0].get("br") and tw[1].get("glue") and "glue" not in tw[0]
+
+
+def test_caption_colours_land_on_the_true_colour_after_libass_bt601():
+    """libass converts with BT.601; the colour written must come out as the true colour's BT.709 YUV."""
+    from editor.captions import _bgr
+    for hx in ("#5B2A86", "#FF7A1A", "#FFFFFF", "#000000", "#2E8B57"):
+        r, g, b = (int(hx[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        y709 = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        want = (y709, (b - y709) / 1.8556, (r - y709) / 1.5748)
+        bb, gg, rr = (int(_bgr(hx)[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        y601 = 0.299 * rr + 0.587 * gg + 0.114 * bb
+        got = (y601, (bb - y601) / 1.772, (rr - y601) / 1.402)
+        assert max(abs(a - c) for a, c in zip(want, got)) < 2.5 / 255

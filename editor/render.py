@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import analyze, captions, color, cutout, faces, ffmpeg, fonts, grade, layout, overlays, quality, score, voice
 from .broll import IMAGE_EXTS
-from .config import FORMATS, FPS
+from .config import FORMATS, FPS, TO_YUV
 from .editjson import SFX_VOLUME, seg_len, timeline_duration
 from .graphics.desk import render_desk
 from .graphics.kit import KIT_TYPES
@@ -168,9 +168,9 @@ def desks_filter(desk_inputs: list, cur: str) -> tuple[list, str]:
     for j, (item, kb, kf, pl) in enumerate(desk_inputs):
         at, dur = item["at"], item["dur"]
         on = f"enable='between(t,{_r(at)},{_r(at + dur)})'"
-        parts.append(f"[{kb}:v]setpts=PTS-STARTPTS+{at}/TB[dk{j}]")
+        parts.append(f"[{kb}:v]setpts=PTS-STARTPTS+{at}/TB,{TO_YUV}[dk{j}]")
         parts.append(f"[{cur}][dk{j}]overlay={on}:eof_action=repeat[odk{j}]")
-        parts.append(f"[{kf}:v]setpts=PTS-STARTPTS+{at}/TB,scale={pl['w']}:{pl['h']}[fg{j}]")
+        parts.append(f"[{kf}:v]setpts=PTS-STARTPTS+{at}/TB,scale={pl['w']}:{pl['h']},{TO_YUV}[fg{j}]")
         parts.append(f"[odk{j}][fg{j}]overlay=x={pl['x']}:y={pl['y']}:{on}:eof_action=repeat[ofg{j}]")
         cur = f"ofg{j}"
     return parts, cur
@@ -186,10 +186,10 @@ def person_filter(person_inputs: list, cur: str) -> tuple[list, str]:
             parts.append(f"[{cur}]eq=saturation=0.3:brightness=-0.13:{on}[ps{j}]")
             cur = f"ps{j}"
         if kg is not None:
-            parts.append(f"[{kg}:v]setpts=PTS-STARTPTS+{at}/TB[pg{j}]")
+            parts.append(f"[{kg}:v]setpts=PTS-STARTPTS+{at}/TB,{TO_YUV}[pg{j}]")
             parts.append(f"[{cur}][pg{j}]overlay={on}:eof_action=pass[pgo{j}]")
             cur = f"pgo{j}"
-        parts.append(f"[{kf}:v]setpts=PTS-STARTPTS+{at}/TB[pf{j}]")
+        parts.append(f"[{kf}:v]setpts=PTS-STARTPTS+{at}/TB,{TO_YUV}[pf{j}]")
         parts.append(f"[{cur}][pf{j}]overlay={on}:eof_action=pass[pfo{j}]")
         cur = f"pfo{j}"
     return parts, cur
@@ -358,9 +358,9 @@ def video_filter(plan: dict, src_index: dict | int, broll_inputs: list, gfx_inpu
     scene = [(j, x) for j, x in enumerate(gfx_inputs) if len(x) > 2 and x[2] is not None]
     for j, (item, k, kf) in scene:
         on = f"enable='{scene_window(item['at'], item['dur'], broll_windows)}'"
-        parts.append(f"[{k}:v]setpts=PTS-STARTPTS+{item['at']}/TB[g{j}]")
+        parts.append(f"[{k}:v]setpts=PTS-STARTPTS+{item['at']}/TB,{TO_YUV}[g{j}]")
         parts.append(f"[{cur}][g{j}]overlay={on}:eof_action=pass[og{j}]")
-        parts.append(f"[{kf}:v]setpts=PTS-STARTPTS+{item['at']}/TB[gf{j}]")
+        parts.append(f"[{kf}:v]setpts=PTS-STARTPTS+{item['at']}/TB,{TO_YUV}[gf{j}]")
         parts.append(f"[og{j}][gf{j}]overlay={on}:eof_action=pass[ogf{j}]")
         cur = f"ogf{j}"
     tr_parts, cur = transitions_filter(plan.get("transitions", []), cur, size)  # under graphics: cards cover the burn
@@ -375,7 +375,7 @@ def video_filter(plan: dict, src_index: dict | int, broll_inputs: list, gfx_inpu
             continue
         at, dur = item["at"], item["dur"]
         on = f"enable='{graphic_window(at, dur, end)}'"
-        parts.append(f"[{k}:v]setpts=PTS-STARTPTS+{at}/TB[g{j}]")
+        parts.append(f"[{k}:v]setpts=PTS-STARTPTS+{at}/TB,{TO_YUV}[g{j}]")
         parts.append(f"[{cur}][g{j}]overlay={on}:eof_action=repeat[og{j}]")
         cur = f"og{j}"
     ov_parts, cur = overlays.filter_parts([x for x in overlay_inputs if x[0].get("layer") != "under"], cur, size)
