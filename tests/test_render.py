@@ -85,7 +85,7 @@ def test_transitions_and_person_effects_in_the_filter():
     vf = video_filter(plan, {"a.mp4": 0}, [], [], (1080, 1920),
                       person_inputs=[({"type": "spotlight", "at": 0.5, "dur": 1}, 1, None),
                                      ({"type": "glow", "at": 2, "dur": 1}, 2, 3)])
-    assert "eq=saturation=0.3" in vf and "[3:v]setpts=PTS-STARTPTS+2/TB[pg1]" in vf
+    assert "eq=saturation=0.3" in vf and "[3:v]setpts=PTS-STARTPTS+2/TB,scale=out_color_matrix=bt709:out_range=tv,format=yuva420p[pg1]" in vf
     for marker in ("eq=brightness=", "avgblur=sizeX=40", "eval=frame,crop=1080:1920", "drawbox=c=black",
                    "rgbashift=rh=-14"):
         assert marker in vf

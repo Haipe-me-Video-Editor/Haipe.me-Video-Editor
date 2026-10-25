@@ -20,7 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import FPS, ffmpeg_bin, ffprobe_bin
+from .config import FPS, TO_YUV, ffmpeg_bin, ffprobe_bin
 
 STILL_EXTS = {".png", ".webp", ".jpg", ".jpeg"}
 ALPHA_EXTS = {".mov", ".webm", ".png", ".webp"}
@@ -86,13 +86,13 @@ def filter_parts(inputs: list, cur: str, size: tuple, tag: str = "ov") -> tuple[
         if color:
             chain += [f"format=yuv444p,chromakey=color=0x{color.lstrip('#')}:similarity={GREEN_SIMILARITY}"
                       f":blend={GREEN_BLEND}", "format=rgba", "despill=type=green:mix=0.6:expand=0.1"]
-        chain += [f"scale={w}:-2:flags=lanczos", "format=rgba"]
+        chain += [f"scale={w}:-2:flags=lanczos", "format=rgba", TO_YUV]
         if item.get("flip"):
             chain.append("hflip")
         parts.append(f"[{k}:v]{','.join(chain)}[{tag}{j}]")
         x, y = item.get("x", 0.5), item.get("y", 0.5)
         parts.append(f"[{cur}][{tag}{j}]overlay=x='{W * x:.1f}-overlay_w/2':y='{H * y:.1f}-overlay_h/2'"
-                     f":enable='between(t,{at:.3f},{at + dur:.3f})':eof_action=pass:format=auto[{tag}o{j}]")
+                     f":enable='between(t,{at:.3f},{at + dur:.3f})':eof_action=pass:format=yuv420[{tag}o{j}]")
         cur = f"{tag}o{j}"
     if inputs:
         parts.append(f"[{cur}]format=yuv420p[{tag}out]")
