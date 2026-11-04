@@ -14,6 +14,11 @@ FPS = 30
 # Left to ffmpeg, the conversion uses BT.601 (a deep plum came out visibly off its colour), and an RGBA overlay with
 # format=auto turns the whole picture to RGB, which clips saturated footage (a violet wall went lighter and greyer).
 TO_YUV = "scale=out_color_matrix=bt709:out_range=tv,format=yuva420p"
+# The light burns blend in RGB over every frame (the blend is only enabled in its window, the conversion is not):
+# both ways are pinned to BT.709 limited range. Left to negotiation, the way in and the way out disagreed and every
+# frame of the video came out 2-3 levels greener.
+TO_RGB = "scale=in_color_matrix=bt709:in_range=tv,format=gbrp"
+FROM_RGB = "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p"
 FORMATS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080)}
 
 

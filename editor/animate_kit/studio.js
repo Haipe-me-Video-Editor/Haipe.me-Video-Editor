@@ -130,12 +130,73 @@
     return cache.get(key);
   }
 
+  // ---- one take: values that carry from beat to beat --------------------------------------------------------------
+  // A value over time from keys [[t0, v0], [t1, v1], ...] (sorted by time). A value is a number, a hex colour or an
+  // object of numbers and colours; each segment eases with `fn` (or the key's own third entry). Before the first key
+  // it holds v0, after the last it holds the last value: a property is defined at every moment of the film.
+  function keys(t, list, fn = ease.inOut) {
+    if (!list.length) throw new Error("Studio.keys needs at least one key");
+    if (t <= list[0][0]) return list[0][1];
+    for (let i = 1; i < list.length; i++) {
+      const [t1, v1, f] = list[i];
+      if (t <= t1) {
+        const [t0, v0] = list[i - 1];
+        return blendValue(v0, v1, (f || fn)(clamp((t - t0) / Math.max(t1 - t0, 1e-6))));
+      }
+    }
+    return list[list.length - 1][1];
+  }
+
+  function blendValue(a, b, k) {
+    if (typeof a === "number") return lerp(a, b, k);
+    if (typeof a === "string") return a === b ? a : mix(a, b, k);
+    const out = {};
+    for (const key of Object.keys(a)) out[key] = key in b ? blendValue(a[key], b[key], k) : a[key];
+    for (const key of Object.keys(b)) if (!(key in a)) out[key] = b[key];
+    return out;
+  }
+
+  // One shape growing into the next: a box is { x, y, w, h, r, fill, alpha } (x, y its centre, r its corner radius;
+  // a dot is a box with r = w / 2). morph(a, b, k) passes through every size between, so a dot becomes a cursor, the
+  // cursor a field, the field a window, with nothing cut in between.
+  const morph = (a, b, k) => blendValue({ r: 0, alpha: 1, ...a }, { r: 0, alpha: 1, ...b }, clamp(k));
+
+  function box(ctx, b, stroke = null, lineWidth = 0) {
+    const r = Math.max(0, Math.min(b.r || 0, b.w / 2, b.h / 2));
+    ctx.save();
+    ctx.globalAlpha *= b.alpha === undefined ? 1 : b.alpha;
+    ctx.beginPath();
+    ctx.roundRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h, r);
+    if (b.fill) {
+      ctx.fillStyle = b.fill;
+      ctx.fill();
+    }
+    if (stroke && lineWidth) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // The camera of a one-take film is one path over the whole film, so it never resets at a shot's edge:
+  // camera(t) -> { x, y, zoom, rot } (the point it looks at, how close, a tilt in degrees). Shots draw in world
+  // coordinates, where the frame's centre at zoom 1 is (w / 2, h / 2).
+  function applyCamera(ctx, cam, w, h) {
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(((cam.rot || 0) * Math.PI) / 180);
+    ctx.scale(cam.zoom || 1, cam.zoom || 1);
+    ctx.translate(-(cam.x === undefined ? w / 2 : cam.x), -(cam.y === undefined ? h / 2 : cam.y));
+  }
+
   // Build the film. `shots` carry id, start, dur (from shots.json) and a draw function:
-  //   draw(ctx, s) with s = { t, local, p, dur, w, h }: t is film time, local is time inside the shot, p is 0..1.
-  // Neighbouring shots cross-fade over `blend` seconds. `post(ctx, t)` runs last on every frame (grain, vignette).
+  //   draw(ctx, s) with s = { t, local, p, dur, w, h, cam }: t is film time, local is time inside the shot, p is 0..1.
+  // Neighbouring shots cross-fade over `blend` seconds (a one-take film uses 0: each shot hands its last frame to the
+  // next). `camera(t)` (optional) moves the whole film; `s.screen(fn)` draws fn(ctx) in frame coordinates, outside
+  // the camera (a HUD, a caption plate). `post(ctx, t)` runs last on every frame (grain, vignette).
   // `background: null` leaves the canvas transparent, to draw over <video> clips placed under it.
   // Returns the paused timeline; add DOM tweens to it, then register it as the last line of the build.
-  function film({ canvas, duration, shots, blend = 0.35, post = null, background = "#000" }) {
+  function film({ canvas, duration, shots, blend = 0.35, post = null, background = "#000", camera = null }) {
     const ctx = canvas.getContext("2d");
     const w = canvas.width, h = canvas.height;
     const buffer = layer(w, h), bctx = buffer.getContext("2d");
@@ -144,8 +205,16 @@
 
     function drawShot(target, shot, t) {
       const local = t - shot.start;
+      const cam = camera ? camera(t) : null;
       target.save();
-      shot.draw(target, { t, local, p: clamp(local / shot.dur), dur: shot.dur, w, h });
+      if (cam) applyCamera(target, cam, w, h);
+      const screen = (fn) => {
+        target.save();
+        target.setTransform(1, 0, 0, 1, 0, 0);
+        fn(target);
+        target.restore();
+      };
+      shot.draw(target, { t, local, p: clamp(local / shot.dur), dur: shot.dur, w, h, cam, screen });
       target.restore();
     }
 
@@ -186,5 +255,5 @@
   }
 
   window.Studio = { TAU, rng, hash, noise, fbm, clamp, lerp, smooth, span, ease, rgba, mix, layer, grain, vignette,
-    once, film };
+    once, keys, morph, box, applyCamera, film };
 })();

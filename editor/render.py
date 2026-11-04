@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import analyze, captions, color, cutout, faces, ffmpeg, fonts, grade, layout, overlays, quality, score, voice
 from .broll import IMAGE_EXTS
-from .config import FORMATS, FPS, TO_YUV
+from .config import FORMATS, FPS, FROM_RGB, TO_RGB, TO_YUV
 from .editjson import SFX_VOLUME, seg_len, timeline_duration
 from .graphics.desk import render_desk
 from .graphics.kit import KIT_TYPES
@@ -49,7 +49,8 @@ def voice_filter(plan: dict, src_index: dict, voice_settings: dict | None = None
             labels.append(f"[a{i}]")
             continue
         tempo = "".join(f"atempo={f}," for f in _atempo_chain(s.get("speed", 1.0)))
-        parts.append(f"[{k}:a]atrim=start={s['in']}:end={s['out']},asetpts=PTS-STARTPTS,{tempo}"
+        level = f"volume={s['gain_db']}dB," if s.get("gain_db") else ""  # evens out takes recorded louder or softer
+        parts.append(f"[{k}:a]atrim=start={s['in']}:end={s['out']},asetpts=PTS-STARTPTS,{tempo}{level}"
                      f"afade=t=in:d=0.03,afade=t=out:st={max(d - 0.03, 0):.3f}:d=0.03[a{i}]")
         labels.append(f"[a{i}]")
     parts.append(f"{''.join(labels)}concat=n={len(labels)}:v=0:a=1,{voice.chain(voice_settings, model)}[voice]")
@@ -130,13 +131,17 @@ def segments_filter(plan: dict, src_index: dict, size: tuple, seeked: bool = Fal
                else f"[{src_index[s['src']]}:v]trim=start={s['in']}:end={end}")
         if s.get("push"):  # push-in: zoom eases from z to push across the segment, or over push_dur then holds
             zz = f"({z}+({s['push']}-{z})*(1-pow(1-min(t/{s.get('push_dur', frames / FPS):.3f},1),2)))"
-            size_expr = f"w='2*trunc({W}*{zz}/2)':h='2*trunc({H}*{zz}/2)':eval=frame"
+            sw, sh = f"(2*trunc({W}*{zz}/2))", f"(2*trunc({H}*{zz}/2))"
+            size_expr = f"w='{sw}':h='{sh}':eval=frame"
         else:
             size_expr = f"{_even(W * z)}:{_even(H * z)}:force_original_aspect_ratio=increase"
+            sw, sh = "iw", "ih"
+        # crop's iw/ih are the size of the first frame: while a push changes the size, the window follows the zoom
+        # expression itself, or the focus drifts (a 1.42x -> 1.26x ease-out ended 0.06 of the frame off centre)
         parts.append(f"{cut},setpts={pts},fps={FPS},"
                      f"trim=end_frame={frames},setpts=PTS-STARTPTS,"
                      f"scale={size_expr},"
-                     f"crop={W}:{H}:x='min(max(iw*{fx}-ow/2,0),iw-ow)':y='min(max(ih*{fy}-oh/2,0),ih-oh)',"
+                     f"crop={W}:{H}:x='min(max({sw}*{fx}-ow/2,0),{sw}-ow)':y='min(max({sh}*{fy}-oh/2,0),{sh}-oh)',"
                      + (s["_grade"] + "," if s.get("_grade") else "") + f"setsar=1,format=yuv420p[v{i}]")
         labels.append(f"[v{i}]")
     strength = plan.get("retouch", 0)
@@ -205,6 +210,15 @@ LEAK_KEYS = [(-0.20, 1.00, 1.00, 1.00, 0.00), (-0.167, 1.00, 0.80, 0.75, 0.02), 
              (0.0, 1.00, 1.00, 1.00, 0.97), (0.033, 1.00, 0.65, 0.30, 0.55), (0.067, 1.00, 0.45, 0.30, 0.20),
              (0.10, 1.00, 0.55, 0.50, 0.06), (0.133, 1.00, 0.85, 0.82, 0.00), (0.167, 1.00, 1.00, 1.00, 0.00)]
 LEAK_LO, LEAK_HI = (255, 120, 30), (255, 240, 215)  # light colour at low and full strength
+# A client editor's burn (measured 2026-10-29), fitted per frame as out = a*in + b on both B-roll edges:
+# (seconds from the cut, a r, a g, a b, b r, b g, b b). Light builds over four frames, peaks warm cream on the cut
+# (about 250/232/163), and falls away within four frames: no dark red tail.
+LEAK_MAY = [(-0.20, 1.0, 1.0, 1.0, 0, 0, 0), (-0.167, .95, .99, 1.0, 9, 1, 0), (-0.133, .91, .99, .99, 31, 2, 1),
+            (-0.10, .56, .92, .99, 110, 18, 0), (-0.067, .12, .50, .96, 214, 116, 5),
+            (-0.033, .03, .50, .92, 242, 161, 88), (0.0, .02, .46, .84, 246, 181, 68),
+            (0.033, .39, .83, 1.0, 178, 75, 0), (0.067, .46, .87, .98, 132, 28, 1), (0.10, .59, .94, 1.0, 116, 21, 0),
+            (0.133, .93, .96, .99, 8, 2, 1), (0.20, .87, .94, .98, 12, 5, 2), (0.30, .93, .97, .99, 6, 2, 1),
+            (0.40, 1.0, 1.0, 1.0, 0, 0, 0)]
 
 
 def _lerp_expr(keys: list, d: str) -> str:
@@ -247,6 +261,14 @@ def _leak_expr(ch: str, c: float) -> str:
     return f"clip(A*({m})+(255-A*({m}))*({k})*{side}*{col}/255,0,255)"
 
 
+def _leak_may_expr(ch: str, c: float) -> str:
+    i = "rgb".index(ch)
+    d = f"(T-{_r(c)})"
+    a = _lerp_expr([(k[0], k[1 + i]) for k in LEAK_MAY], d)
+    b = _lerp_expr([(k[0], k[4 + i]) for k in LEAK_MAY], d)
+    return f"clip(A*({a})+{b},0,255)"
+
+
 def transitions_filter(transitions: list, cur: str, size: tuple) -> tuple[list, str]:
     """Hits on the cuts: flash (to white), whip (horizontal blur), zoom (punch-in), dip (black), glitch (RGB split)."""
     W, H = size
@@ -267,13 +289,15 @@ def transitions_filter(transitions: list, cur: str, size: tuple) -> tuple[list, 
             parts.append(f"[{cur}]scale=w='2*trunc({W}*{k}/2)':h='2*trunc({H}*{k}/2)':eval=frame,crop={W}:{H},"
                          f"setsar=1,gblur=sigma=6:{win(-FRAME, FRAME)}[tr{j}]")
         elif x["type"] == "leak":  # light burn: red, orange, warm white on the cut, orange haze, clean
-            parts.append(f"[{cur}]format=gbrp,split[lk{j}a][lk{j}b];[lk{j}a][lk{j}b]blend="
-                         + ":".join(f"c{p}_expr='{_leak_expr(ch, c)}'" for p, ch in enumerate("gbr"))
-                         + f":{win(LEAK_KEYS[0][0], LEAK_KEYS[-1][0])},format=yuv420p[tr{j}]")
+            may = x.get("look") == "may"  # the client editor's newer, smoother burn (May-1)
+            expr, keys = (_leak_may_expr, LEAK_MAY) if may else (_leak_expr, LEAK_KEYS)
+            parts.append(f"[{cur}]{TO_RGB},split[lk{j}a][lk{j}b];[lk{j}a][lk{j}b]blend="
+                         + ":".join(f"c{p}_expr='{expr(ch, c)}'" for p, ch in enumerate("gbr"))
+                         + f":{win(keys[0][0], keys[-1][0])},{FROM_RGB}[tr{j}]")
         elif x["type"] == "sweep":  # light sweep: a light band in the accent colour crosses the frame, flashing on the cut
-            parts.append(f"[{cur}]format=gbrp,split[sw{j}a][sw{j}b];[sw{j}a][sw{j}b]blend="
+            parts.append(f"[{cur}]{TO_RGB},split[sw{j}a][sw{j}b];[sw{j}a][sw{j}b]blend="
                          + ":".join(f"c{p}_expr='{_sweep_expr(ch, c, x.get("color", SWEEP_COLOR))}'" for p, ch in enumerate("gbr"))
-                         + f":{win(-0.22, 0.22)},format=yuv420p[tr{j}]")
+                         + f":{win(-0.22, 0.22)},{FROM_RGB}[tr{j}]")
         elif x["type"] == "settle":  # the shot opens pushed in and eases out to 1.0 (a strong hook)
             k = f"(1+{x.get('amount', 0.15)}*gte(t,{_r(c)})*pow(max(0,1-(t-{_r(c)})/{x.get('dur', 0.6)}),2))"
             parts.append(f"[{cur}]scale=w='2*trunc({W}*{k}/2)':h='2*trunc({H}*{k}/2)':eval=frame,crop={W}:{H},"
@@ -312,6 +336,69 @@ def scene_window(at: float, dur: float, broll_windows: list) -> str:
     return expr
 
 
+def glass_parts(item: dict, cur: str, size: tuple, j: int, blur: int = 26) -> tuple[list, str]:
+    """The blur behind a frosted glass card: the region under its box cropped, blurred, cut to the card's shape (a
+    rounded rectangle or a disc, one mask frame held) and laid back, fading in and out with the card."""
+    W, H = size
+    x0, y0, x1, y1 = item["box"]
+    x, y = int(x0 * W) // 2 * 2, int(y0 * H) // 2 * 2
+    w, h = int((x1 - x0) * W) // 2 * 2, int((y1 - y0) * H) // 2 * 2
+    a0, a1 = item["at"] + item.get("t", 0.0), item["at"] + item["dur"]
+    if item.get("shape", "rect") == "disc":
+        inside = f"lte(hypot(X-{w / 2:.1f},Y-{h / 2:.1f}),{min(w, h) / 2:.1f})"
+    else:
+        r = item.get("radius", 0.035) * W
+        dx, dy = f"max(max({r:.1f}-X,X-{w - r:.1f}),0)", f"max(max({r:.1f}-Y,Y-{h - r:.1f}),0)"
+        inside = f"lte({dx}*{dx}+{dy}*{dy},{r * r:.1f})"
+    parts = [f"[{cur}]split[gs{j}a][gs{j}b]",
+             f"color=c=black:s={w}x{h}:r={FPS}:d=0.04,format=gray,geq=lum='255*{inside}',"
+             f"loop=loop=-1:size=1,setpts=N/{FPS}/TB[gm{j}]",
+             f"[gs{j}b]crop={w}:{h}:{x}:{y},boxblur=luma_radius={blur}:luma_power=2:chroma_radius={blur // 2},"
+             f"format=yuva420p[gb{j}]",
+             f"[gb{j}][gm{j}]alphamerge,fade=t=in:st={_r(a0)}:d=0.25:alpha=1,"
+             f"fade=t=out:st={_r(max(a0 + 0.3, a1 - 0.25))}:d=0.25:alpha=1[gk{j}]",
+             f"[gs{j}a][gk{j}]overlay={x}:{y}:enable='between(t,{_r(a0)},{_r(a1)})':shortest=1[gq{j}]"]
+    return parts, f"gq{j}"
+
+
+PUSH_DUR = 0.45  # a vertical push between the speaker and a B-roll shot (a client's measured edit: 0.40-0.50 s)
+
+
+def push_y(at: float, dur: float, d: float, pushes: list, H: int, style: str = "push") -> tuple[str, str]:
+    """overlay y expressions for a B-roll shot that pushes in (its first d seconds) and/or out (its last d), and for
+    the shot under it. In: the B-roll comes down from above while the speaker is pushed down out of frame. Out: the
+    B-roll carries on down and the speaker comes in from above. Eased in and out (smoothstep)."""
+    def ease(t0):
+        p = f"min(max((t-{_r(t0)})/{d},0),1)"
+        return f"({p}*{p}*(3-2*{p}))"
+    base, shot = [], []
+    if style == "drop":  # May-1: the leaving shot accelerates away over black, the arriving one lands in the last 40%
+        def p(t0):
+            return f"min(max((t-{_r(t0)})/{d},0),1)"
+
+        def out_(t0):  # ease-in: 0 -> 1
+            return f"pow({p(t0)},2.2)"
+
+        def in_(t0):  # 1 -> 0, ease-out, starting at 60%
+            return f"pow(1-min(max(({p(t0)}-0.6)/0.4,0),1),2)"
+        if "enter" in pushes:
+            base.append(f"between(t,{_r(at)},{_r(at + d)})*{H}*{out_(at)}")
+            shot.append(f"lt(t,{_r(at + d)})*(-{H}*{in_(at)})")
+        if "exit" in pushes:
+            t0 = at + dur - d
+            base.append(f"between(t,{_r(t0)},{_r(at + dur)})*(-{H}*{in_(t0)})")
+            shot.append(f"gte(t,{_r(t0)})*{H}*{out_(t0)}")
+        return "+".join(base), "+".join(shot) or "0"
+    if "enter" in pushes:
+        base.append(f"between(t,{_r(at)},{_r(at + d)})*{H}*{ease(at)}")
+        shot.append(f"lt(t,{_r(at + d)})*(-{H}+{H}*{ease(at)})")
+    if "exit" in pushes:
+        t0 = at + dur - d
+        base.append(f"between(t,{_r(t0)},{_r(at + dur)})*(-{H}+{H}*{ease(t0)})")
+        shot.append(f"gte(t,{_r(t0)})*{H}*{ease(t0)}")
+    return "+".join(base), "+".join(shot) or "0"
+
+
 SPLIT_Y = 0.08  # split-screen B-roll: the speaker's half starts this far down the frame (head and chest)
 
 
@@ -342,7 +429,20 @@ def video_filter(plan: dict, src_index: dict | int, broll_inputs: list, gfx_inpu
         else:
             parts.append(f"[{k}:v]setpts=PTS-STARTPTS,trim=start={src_in:.3f}:duration={dur + 0.1:.3f},"
                          f"setpts=PTS-STARTPTS+{at}/TB,fps={FPS},{fit}[b{j}]")
-            parts.append(f"[{cur}][b{j}]overlay={on}:eof_action=pass[ob{j}]")
+            pushes = [e for e in ("enter", "exit") if item.get(e) == "push"]
+            if pushes:  # the shots slide vertically: the incoming one comes down from the top, pushing the other out
+                pd = item.get("push_dur", PUSH_DUR)
+                base_y, shot_y = push_y(at, dur, pd, pushes, H, item.get("push_style", "push"))
+                parts.append(f"color=c=black:s={W}x{H}:r={FPS},format=yuv420p[pk{j}];"
+                             f"[pk{j}][{cur}]overlay=x=0:y='{base_y}':shortest=1[pb{j}]")
+                parts.append(f"[pb{j}][b{j}]overlay=x=0:y='{shot_y}':{on}:eof_action=pass[pm{j}]")
+                # motion blur: a vertical blur while the shots move fastest (mixing whole frames left ghosts)
+                fast = (0.55, 1.0) if item.get("push_style") == "drop" else (0.2, 0.8)
+                wins = ([(at, at + pd)] if "enter" in pushes else []) + ([(at + dur - pd, at + dur)] if "exit" in pushes else [])
+                blur = "+".join(f"between(t,{_r(a + fast[0] * pd)},{_r(a + fast[1] * pd)})" for a, b in wins)
+                parts.append(f"[pm{j}]avgblur=sizeX=1:sizeY={max(2, H // 120)}:enable='{blur}'[ob{j}]")
+            else:
+                parts.append(f"[{cur}][b{j}]overlay={on}:eof_action=pass[ob{j}]")
         cur = f"ob{j}"
     look_parts, cur = looks_filter(plan.get("looks", []), cur, size)
     parts += look_parts
@@ -374,6 +474,9 @@ def video_filter(plan: dict, src_index: dict | int, broll_inputs: list, gfx_inpu
         if j in in_scene:
             continue
         at, dur = item["at"], item["dur"]
+        if item.get("type") == "glass":  # frosted glass: the frame under the card is blurred while it is up
+            gp, cur = glass_parts(item, cur, size, j)
+            parts += gp
         on = f"enable='{graphic_window(at, dur, end)}'"
         parts.append(f"[{k}:v]setpts=PTS-STARTPTS+{at}/TB,{TO_YUV}[g{j}]")
         parts.append(f"[{cur}][g{j}]overlay={on}:eof_action=repeat[og{j}]")

@@ -5,13 +5,20 @@ and a shot list, draws each shot in `comp/shots.js`, checks snapshots against th
     python -m editor animate-new <dir> --topic "how a hummingbird hovers" --seconds 15 --format 9:16 --refs a.jpg
     python -m editor animate-snap <dir>      # contact sheet of every shot, to check against the style bible
     python -m editor animate-sound <dir>     # sound.json -> sound.wav (listen before the render)
+    python -m editor animate-check <dir>     # one-take films: every shot hands over without a visible cut
     python -m editor animate-render <dir>    # final MP4 with sound, checked by qc
+
+`animate-new --onetake` makes a one-take film: no dissolves, one camera over the whole film, and each shot starts
+from exactly what the last one ended on (a dot becomes a cursor, the cursor a field, the field a window). A shot
+marked `"cut": true` in shots.json may cut hard into the one before it; everywhere else animate-check (and the
+render) refuses a hand-over that jumps.
 
 A film folder holds brief.json (topic, length, format), style.md (the style bible), shots.json (the shot list,
 which owns all timing), sound.json (the sound cues, see editor/synth.py), refs/ (the references) and comp/ (the
 HyperFrames composition: index.html, shots.js and the studio.js runtime).
 """
 import hashlib
+import itertools
 import json
 import re
 import shutil
@@ -76,7 +83,7 @@ def _font_faces(names: list) -> str:
 
 
 def new(film, topic: str, seconds: float = 15, fmt: str = "9:16", shots: int = 5, refs=(), font_names=None,
-        fps: int = 30) -> Path:
+        fps: int = 30, onetake: bool = False) -> Path:
     """Scaffold a film folder. Refuses a folder that already has a brief, so work is never overwritten."""
     film = Path(film)
     if (film / "brief.json").exists():
@@ -112,7 +119,8 @@ def new(film, topic: str, seconds: float = 15, fmt: str = "9:16", shots: int = 5
     (comp / "shots.js").write_text((KIT / "shots.js").read_text(encoding="utf-8").replace("$DRAW", draw),
                                    encoding="utf-8")
     _write_json(film / "brief.json", {"topic": topic, "seconds": seconds, "format": fmt, "width": w, "height": h,
-                                      "fps": fps, "blend": 0.35, "fonts": names, "refs": kept})
+                                      "fps": fps, "blend": 0 if onetake else 0.35, "fonts": names, "refs": kept,
+                                      "mode": "onetake" if onetake else "shots"})
     _write_json(film / "shots.json", shot_list)
     _write_json(film / "sound.json", {"seed": 7, "reverb": 0.2, "cues": []})
     (film / "style.md").write_text(STYLE_MD.format(topic=topic), encoding="utf-8")
@@ -142,6 +150,8 @@ def check_shots(shots: list) -> list:
         ids.add(sid)
         if s["dur"] <= 0:
             raise SystemExit(f"shot {sid}: dur must be above 0")
+        if not isinstance(s.get("cut", False), bool):
+            raise SystemExit(f"shot {sid}: cut is true (a hard cut into this shot is meant) or false")
         if abs(s["start"] - end) > 0.011:
             raise SystemExit(f"shot {sid} starts at {s['start']}s but the shot before it ends at {end:g}s: "
                              "shots must follow each other with no gap or overlap")
@@ -159,8 +169,8 @@ def sync(film) -> dict:
     brief, shots = load(film)
     total = duration(shots)
     data = {"width": brief["width"], "height": brief["height"], "fps": brief["fps"], "duration": total,
-            "blend": brief.get("blend", 0.35), "shots": [{k: s[k] for k in ("id", "start", "dur", "what") if k in s}
-                                                          for s in shots]}
+            "blend": brief.get("blend", 0.35), "mode": brief.get("mode", "shots"),
+            "shots": [{k: s[k] for k in ("id", "start", "dur", "what", "cut") if k in s} for s in shots]}
     comp = film / "comp"
     (comp / "timing.js").write_text("window.FILM = " + json.dumps(data, ensure_ascii=False) + ";\n", encoding="utf-8")
     page = (comp / "index.html").read_text(encoding="utf-8")
@@ -237,6 +247,105 @@ def check_drawn(film) -> None:
                              "reading the style only, and the film draws everything itself")
 
 
+# ---- one take ---------------------------------------------------------------------------------------------------
+GRID = 12          # the frame is compared in GRID x GRID cells, so a small thing popping in counts as much as a pan
+JUMP_FLOOR = 0.08  # a hand-over may always change a cell this much (0..1 of the grey range)
+JUMP_RATIO = 3.0   # ... or this many times the frame-to-frame change on either side of it
+
+
+def change(a, b) -> float:
+    """How much the picture changes from frame a to frame b: the 99th percentile of the mean absolute difference
+    of GRID x GRID cells, on grey frames in 0..1 (so one or two cells that change a lot count). A camera move
+    changes most cells a little; a cut changes many a lot; a thing appearing from nowhere changes a few cells a
+    lot. Motion is measured the same way on both sides of a hand-over, so a small thing that moves fast is fair."""
+    import numpy as np
+    a, b = (np.asarray(x, np.float32) for x in (a, b))
+    h, w = a.shape
+    ch, cw = h // GRID, w // GRID
+    d = np.abs(a[:ch * GRID, :cw * GRID] - b[:ch * GRID, :cw * GRID]).reshape(GRID, ch, GRID, cw).mean(axis=(1, 3))
+    return float(np.percentile(d, 99))
+
+
+def handovers(shots: list, fps: float) -> list:
+    """Every shot boundary to check, with the four frame times around it: two frames before the hand-over, the
+    hand-over itself (last frame of one shot to first of the next), one frame after. Shots marked cut are skipped."""
+    out = []
+    for prev, nxt in itertools.pairwise(shots):
+        if nxt.get("cut"):
+            continue
+        b = nxt["start"]
+        out.append({"from": prev["id"], "to": nxt["id"], "at": b,
+                    "times": [round(b - 2 / fps, 4), round(b - 1 / fps, 4), round(b, 4), round(b + 1 / fps, 4)]})
+    return out
+
+
+def judge(step_before: float, jump: float, step_after: float) -> bool:
+    """A hand-over is continuous when it changes the picture no more than the motion around it does."""
+    return jump <= max(JUMP_FLOOR, JUMP_RATIO * max(step_before, step_after))
+
+
+def continuity(film) -> list:
+    """Snapshot the frames around every hand-over of a one-take film and judge each one. Returns one result per
+    hand-over: {from, to, at, before, jump, after, ok}."""
+    import numpy as np
+    from PIL import Image
+
+    from .graphics.render import _hf, check_local
+    film = Path(film).resolve()
+    brief, shots = load(film)
+    sync(film)
+    checks = handovers(shots, brief["fps"])
+    if not checks:
+        return []
+    comp = film / "comp"
+    check_local(comp)
+    times = sorted({t for c in checks for t in c["times"]})
+    out = film / "work" / "handovers"
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir(parents=True)
+    _hf(["snapshot", ".", "--at", ",".join(f"{t:g}" for t in times), "-o", str(out)], comp)
+    got = {}
+    for f in out.glob("frame-*-at-*s.png"):
+        got[float(re.search(r"-at-([\d.]+)s\.png$", f.name).group(1))] = f
+    half = 0.5 / brief["fps"]
+
+    def grey(t):
+        near = min(got, key=lambda x: abs(x - t)) if got else None
+        if near is None or abs(near - t) > half:
+            raise RuntimeError(f"hyperframes wrote no frame at {t:g}s in {out}")
+        im = Image.open(got[near]).convert("L")
+        im = im.resize((max(GRID * 8, im.width // 8), max(GRID * 8, im.height // 8)), Image.BILINEAR)
+        return np.asarray(im, np.float32) / 255
+
+    results = []
+    for c in checks:
+        f0, f1, f2, f3 = (grey(t) for t in c["times"])
+        before, jump, after = change(f0, f1), change(f1, f2), change(f2, f3)
+        results.append({"from": c["from"], "to": c["to"], "at": c["at"], "before": round(before, 4),
+                        "jump": round(jump, 4), "after": round(after, 4), "ok": judge(before, jump, after)})
+    _write_json(film / "work" / "handovers.json", results)
+    return results
+
+
+def report_continuity(results: list) -> str:
+    lines = []
+    for r in results:
+        mark = "ok  " if r["ok"] else "CUT "
+        lines.append(f"{mark}{r['from']} -> {r['to']} at {r['at']:g}s: hand-over {r['jump']:.3f} "
+                     f"(motion around it {r['before']:.3f} / {r['after']:.3f})")
+    return "\n".join(lines) or "no hand-overs to check"
+
+
+def require_continuity(film) -> None:
+    results = continuity(film)
+    print(report_continuity(results))
+    bad = [r for r in results if not r["ok"]]
+    if bad:
+        raise SystemExit("one take broken: " + ", ".join(f"{r['from']} -> {r['to']}" for r in bad) + " cut. End "
+                         "each shot on what the next one starts from (the same shape, place and colour), or mark "
+                         "the next shot \"cut\": true if that cut is meant")
+
+
 def render(film, out=None, quality: str = "delivery", silent: bool = False, run_qc: bool = True) -> Path:
     from .graphics.render import _hf, check_local
     film = Path(film).resolve()
@@ -246,6 +355,8 @@ def render(film, out=None, quality: str = "delivery", silent: bool = False, run_
     comp = film / "comp"
     check_local(comp)
     _hf(["lint", "."], comp)
+    if brief.get("mode") == "onetake":
+        require_continuity(film)
     work = film / "work"
     work.mkdir(exist_ok=True)
     picture = work / "picture.mp4"
@@ -285,7 +396,7 @@ def mux(picture, wav, out, total: float, work, size: tuple, run_qc: bool = True)
 
 
 def cmd_new(a) -> None:
-    film = new(a.film, a.topic, a.seconds, a.format, a.shots, a.refs or (), a.fonts, a.fps)
+    film = new(a.film, a.topic, a.seconds, a.format, a.shots, a.refs or (), a.fonts, a.fps, a.onetake)
     print(f"{film}\nnext: write style.md, fill shots.json, draw comp/shots.js, write sound.json")
 
 
@@ -296,6 +407,10 @@ def cmd_snap(a) -> None:
 
 def cmd_sound(a) -> None:
     print(sound(a.film))
+
+
+def cmd_check(a) -> None:
+    require_continuity(a.film)
 
 
 def cmd_render(a) -> None:
@@ -311,9 +426,12 @@ def register(add) -> None:
     p.add_argument("--refs", nargs="*", help="style reference images (a pin, a film frame, an illustration)")
     p.add_argument("--fonts", nargs="*", choices=sorted(fonts.SOURCES), help=f"default: {', '.join(DEFAULT_FONTS)}")
     p.add_argument("--fps", type=int, default=30, choices=[24, 25, 30, 60])
+    p.add_argument("--onetake", action="store_true",
+                   help="one continuous shot: no dissolves, one camera, every shot grows out of the last")
     p = add("animate-snap", cmd_snap, "film")
     p.add_argument("--at", help="comma-separated seconds instead of three frames per shot")
     add("animate-sound", cmd_sound, "film")
+    add("animate-check", cmd_check, "film")
     p = add("animate-render", cmd_render, "film")
     p.add_argument("--out", help="default: <film>/out/film.mp4")
     p.add_argument("--quality", default="delivery", choices=["draft", "looks", "delivery"])

@@ -8,7 +8,8 @@ No cuts. English subtitles translated by meaning from the Arabic, the `natural` 
    `<work>/words.md`, while the studio voice restore runs in the background into `<work>/voice_final.wav`.
 2. Claude writes `<work>/subs.json`: `[[start, end, "line one\\Nline two"], ...]` in source seconds, one idea per
    cue, at most 2 lines of `max_line_chars()` characters, timed to the words.
-3. `reel-deliver <clip> <work> <out_dir> [--style NAME]`: captions → retouch + burn → mux the voice → HQ master and preview.
+3. `reel-deliver <clip> <work> <out_dir> [--style NAME] [--screens screens.json]`: captions → retouch (+ app screens,
+   `screencards`) + burn → mux the voice → HQ master and preview.
 """
 import json
 import subprocess
@@ -83,7 +84,7 @@ def to_ass(subs: list, gap_fill: float = 0.35, style=None) -> str:
     return captions.to_ass(lines, _style(style), SIZE, mode="en").replace("¦", "\\N")
 
 
-def deliver(src, work, out_dir, style=None) -> dict:
+def deliver(src, work, out_dir, style=None, screens=None) -> dict:
     from . import voice
     from .fonts import ensure_font
     from .retouch import retouch_video
@@ -96,8 +97,18 @@ def deliver(src, work, out_dir, style=None) -> dict:
         raise SystemExit("subs.json:\n  " + "\n  ".join(errs))
     ass = work / "en.ass"
     ass.write_text(to_ass(subs, style=style), encoding="utf-8")
-    retouched = retouch_video(src, work / "retouched.mp4", "natural", ass=str(ass),
-                              fonts_dir=str(ensure_font(style["font"]).parent))
+    fonts_dir = str(ensure_font(style["font"]).parent)
+    if screens:  # app screens go under the captions: retouch, add the cards, then burn the captions on top
+        from . import screencards
+        clean = retouch_video(src, work / "retouched-nosubs.mp4", "natural")
+        carded = screencards.render(clean, screens, work / "screens.mp4", style)
+        retouched = work / "retouched.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(carded), "-vf",
+                        f"ass={ass}:fontsdir={fonts_dir}:shaping=complex,format=yuv420p", "-c:v", "libx264",
+                        "-preset", "slow", "-crf", "15", "-color_primaries", "bt709", "-color_trc", "bt709",
+                        "-colorspace", "bt709", "-c:a", "copy", "-movflags", "+faststart", str(retouched)], check=True)
+    else:
+        retouched = retouch_video(src, work / "retouched.mp4", "natural", ass=str(ass), fonts_dir=fonts_dir)
     wav, log = work / "voice_final.wav", work / "voice.log"
     while log.exists() and not any(k in log.read_text() for k in ("VOICE_DONE", "Error", "Traceback")):
         time.sleep(5)  # prep's background restore is still running

@@ -29,6 +29,11 @@ const DRAW = {
 $DRAW
 };
 
+// A one-take film moves one camera over the whole film (it never resets at a shot's edge): return
+// { x, y, zoom, rot } for film time t, e.g. (t) => S.keys(t, [[0, { x: 540, y: 960, zoom: 1, rot: 0 }], ...]).
+// Leave it null for a film whose camera holds.
+const CAMERA = null;
+
 // Called once the fonts are ready (index.html registers the timeline this returns).
 function buildFilm() {
   const shots = FILM.shots.map((shot) => ({ ...shot, draw: DRAW[shot.id] || placeholder(shot.id, shot.what) }));
@@ -37,6 +42,7 @@ function buildFilm() {
     duration: FILM.duration,
     shots,
     blend: FILM.blend,
+    camera: CAMERA,
     background: PALETTE.ink,
     post: (ctx, t) => {
       S.vignette(ctx, 0.28);

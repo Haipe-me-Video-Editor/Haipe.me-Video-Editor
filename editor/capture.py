@@ -136,8 +136,12 @@ def _zoom_to(page, scale: float, at, dur: float) -> None:
         page.wait_for_timeout(int(1000 / 30))
 
 
-def capture(url: str, out, steps: list | None = None, device: str = "phone", wait: float = 1.5) -> dict:
-    """Screenshot (out ends .png/.jpg) or recording (out ends .mp4) of `url`. Returns {"out", "shots"}.
+def capture(url: str, out, steps: list | None = None, device: str = "phone", wait: float = 1.5,
+            cookies: list | None = None, hide: list | None = None, boxes: list | None = None) -> dict:
+    """Screenshot (out ends .png/.jpg) or recording (out ends .mp4) of `url`. Returns {"out", "shots", "boxes"}.
+    `cookies` are "name=value" strings set for the page's site first (a demo build's role or language), `hide` CSS
+    selectors hidden before the shot (a demo bar, an install prompt), and `boxes` selectors whose first match's box
+    is returned in CSS pixels, as `screen-cards` takes them for a highlight.
     Recordings use Chromium's own screencast (each repainted frame with its timestamp), so they need no extra
     binaries; the frames are laid out on a 30 fps timeline by their timestamps."""
     from playwright.sync_api import sync_playwright
@@ -152,9 +156,14 @@ def capture(url: str, out, steps: list | None = None, device: str = "phone", wai
         if device == "phone":
             opts.update(is_mobile=True, has_touch=True, user_agent=UA_PHONE)
         ctx = browser.new_context(**opts)
+        if cookies:
+            ctx.add_cookies([{"name": c.split("=", 1)[0], "value": c.split("=", 1)[1], "url": url} for c in cookies])
         page = ctx.new_page()
         page.goto(url, wait_until="networkidle", timeout=60000)
+        if hide:
+            page.add_style_tag(content=", ".join(hide) + " { display: none !important; }")
         page.wait_for_timeout(int(wait * 1000))
+        found = {sel: page.locator(sel).first.bounding_box() for sel in boxes or []}
         frames = []
         if video:
             cdp = ctx.new_cdp_session(page)
@@ -180,7 +189,7 @@ def capture(url: str, out, steps: list | None = None, device: str = "phone", wai
         browser.close()
         if video:
             _encode(frames, out, d["out"])
-    return {"out": out, "shots": shots}
+    return {"out": out, "shots": shots, "boxes": found}
 
 
 def _encode(frames: list, out: Path, size: tuple) -> None:
@@ -205,8 +214,10 @@ def _encode(frames: list, out: Path, size: tuple) -> None:
 
 def cmd(a) -> None:
     steps = json.loads(Path(a.steps).read_text()) if a.steps else []
-    r = capture(a.url, a.out, steps, a.device, a.wait)
+    r = capture(a.url, a.out, steps, a.device, a.wait, a.cookie, a.hide, a.box)
     print(r["out"], *r["shots"])
+    if r["boxes"]:
+        print(json.dumps(r["boxes"]))
 
 
 def available() -> bool:

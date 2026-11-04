@@ -47,9 +47,10 @@ def pill(text: str, h: int, done: bool, green) -> np.ndarray:
     when not."""
     S = 2
     hh = h * S
-    font = ImageFont.truetype(str(fonts.ensure_font("Montserrat")), int(hh * 0.5))
+    face, direction = fonts.face_for(text, "Montserrat")
+    font = ImageFont.truetype(str(face), int(hh * 0.5))
     probe = ImageDraw.Draw(Image.new("RGBA", (8, 8)))
-    tw = probe.textlength(text, font=font)
+    tw = probe.textlength(text, font=font, direction=direction)
     pad = int(hh * 0.35)
     w = int(hh * 0.28 + hh * 0.62 + hh * 0.26 + tw + hh * 0.42)
     im = Image.new("RGBA", (w + 2 * pad, hh + 2 * pad), (0, 0, 0, 0))
@@ -58,7 +59,8 @@ def pill(text: str, h: int, done: bool, green) -> np.ndarray:
     d.rounded_rectangle([x0, y0, x1, y1], radius=hh / 2, fill=(255, 255, 255, 250), outline=(214, 219, 226, 255),
                         width=max(2, int(hh * 0.05)))
     cr = hh * 0.31
-    cx, cy = x0 + hh * 0.28 + cr, y0 + hh / 2
+    rtl = direction == "rtl"  # Arabic reads from the right: the tick leads on the right, the text to its left
+    cx, cy = (x1 - hh * 0.28 - cr if rtl else x0 + hh * 0.28 + cr), y0 + hh / 2
     if done:
         d.ellipse([cx - cr, cy - cr, cx + cr, cy + cr], fill=tuple(green) + (255,))
         lw = max(3, int(hh * 0.075))
@@ -66,7 +68,11 @@ def pill(text: str, h: int, done: bool, green) -> np.ndarray:
                fill=(255, 255, 255, 255), width=lw, joint="curve")
     else:
         d.ellipse([cx - cr, cy - cr, cx + cr, cy + cr], outline=(200, 205, 212, 255), width=max(2, int(hh * 0.05)))
-    d.text((cx + cr + hh * 0.26, cy), text, font=font, fill=(INK if done else GREY) + (255,), anchor="lm")
+    if rtl:
+        d.text((cx - cr - hh * 0.26, cy), text, font=font, fill=(INK if done else GREY) + (255,), anchor="rm",
+               direction="rtl")
+    else:
+        d.text((cx + cr + hh * 0.26, cy), text, font=font, fill=(INK if done else GREY) + (255,), anchor="lm")
     a = im.getchannel("A")
     shadow = Image.new("RGBA", im.size, (0, 0, 0, 0))
     shadow.putalpha(a.filter(ImageFilter.GaussianBlur(hh * 0.12)).point(lambda v: int(v * 0.28)))

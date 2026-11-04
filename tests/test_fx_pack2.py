@@ -183,3 +183,13 @@ def test_renders_exact_frames(tmp_path, spec):
     from editor.fx.apply import apply_fx
     out = apply_fx(SRC, [{**spec, "at": 0.5, "dur": 2.0}], tmp_path, {"name": "t"})
     assert abs(ffmpeg.probe(out)["duration"] - ffmpeg.probe(SRC)["duration"]) < 0.1
+
+
+def test_news_bars_draws_arabic_right_to_left():
+    # Montserrat has no Arabic letters: the headline came out as empty boxes on a real video (2026-10-27)
+    a = news_bars.sprite("FOMC", "شنو بيصير بنسبة الفوايد؟", 110, (245, 197, 66), 0.0, 900)
+    gold = (a[..., 0] > 0.85) & (a[..., 1] > 0.65) & (a[..., 2] < 0.4) & (a[..., 3] > 0.9)
+    ink = (a[..., :3].max(-1) < 0.2) & (a[..., 3] > 0.9)
+    xs_gold, xs_ink = np.where(gold)[1], np.where(ink)[1]
+    assert xs_ink.size > 2000  # real glyphs, not a few box outlines
+    assert xs_gold.mean() > xs_ink.mean()  # the tag sits on the right, the headline reads leftward from it

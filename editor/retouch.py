@@ -6,7 +6,7 @@ can't shift:
   toward the upper cheek just below; fine detail stays.
 - Evening: mid-frequency blotchiness on the skin is reduced; pores, stubble and lines (high frequency) are kept.
 - Small marks: skin spots clearly darker than their local median are blended toward it.
-Skin is the face oval minus eyes, brows and lips; dark pixels (glasses rims, lashes, beard) and glare are protected.
+Skin is the face oval minus eyes, brows (grown to cover their stray hairs) and lips; dark pixels (glasses rims, lashes, beard) and glare are protected.
 """
 import subprocess
 from pathlib import Path
@@ -91,8 +91,11 @@ def retouch_frame(bgr: np.ndarray, P, under_eye: float = 0.85, marks: float = 0.
     protect = np.clip((L - 70) / 25, 0, 1) * np.clip((235 - L) / 15, 0, 1)
 
     skin = _poly(shape, Q[FACE_OVAL])
+    # The brow ring hugs the brow's centre line; its hairs reach well past it, and the mark remover would read
+    # them as dark spots and lighten them (brows came out patchy and pale). Grow the brow by 5% of the face width.
+    grow = np.ones((2 * int(fw * 0.05) + 1,) * 2, np.uint8)
     for k in ("r", "l"):
-        skin *= (1 - _poly(shape, Q[EYE[k]])) * (1 - _poly(shape, Q[BROW[k]]))
+        skin *= (1 - _poly(shape, Q[EYE[k]])) * (1 - cv2.dilate(_poly(shape, Q[BROW[k]]), grow))
     skin *= 1 - _poly(shape, Q[LIPS])
     skin = cv2.GaussianBlur(cv2.erode(skin, np.ones((3, 3), np.uint8)), (0, 0), fw * 0.01) * protect
 

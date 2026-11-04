@@ -181,11 +181,19 @@ def cmd_timeline(a):
     write_timeline_transcript(proj, editjson.load(proj / "edit.json"), _tr(proj).get("words"))
 
 
+def _style(a, proj: Path, plan: dict) -> dict:
+    """--style when given, else the style edit.json names (a relative .json path resolves against the project)."""
+    name = a.style or plan.get("style") or "default"
+    if name.lower().endswith(".json") and not Path(name).is_absolute() and (proj / name).exists():
+        name = str(proj / name)
+    return load_style(name)
+
+
 def cmd_captions(a):
     proj = Path(a.project)
     plan = editjson.load(proj / "edit.json")
     tr = _tr(proj)
-    lines = captions.ensure_lines(proj / "work" / "captions.json", plan, tr["words"], load_style(a.style),
+    lines = captions.ensure_lines(proj / "work" / "captions.json", plan, tr["words"], _style(a, proj, plan),
                                   FORMATS[plan["format"]], rebuild=True)
     mode = plan["captions"]["mode"]
     need = mode == "bilingual" or (mode in ("ar", "en") and mode != tr.get("language"))
@@ -196,7 +204,8 @@ def cmd_render(a):
     proj = Path(a.project)
     if getattr(a, "master", False):
         os.environ["EDITOR_MASTER"] = "1"  # read by every encode step (editor/quality.py)
-    out = render(proj, editjson.load(proj / "edit.json"), load_style(a.style), draft=getattr(a, "draft", False))
+    plan = editjson.load(proj / "edit.json")
+    out = render(proj, plan, _style(a, proj, plan), draft=getattr(a, "draft", False))
     print(f"rendered {out['final']}")
 
 
@@ -227,6 +236,19 @@ def cmd_tightcut(a):
         print("kept short pauses (cut the ones that end a sentence with --cut-pauses):")
         for p in rec["pauses"]:
             print(f"  {p['at']:7.2f}  {p['gap']:.2f}s  {p['before']} | {p['after']}")
+
+
+def cmd_face_focus(a):
+    """Centre every zoomed segment on the tracked face (MediaPipe landmarks); writes edit.json."""
+    from . import tightcut
+    proj = Path(a.project)
+    plan = editjson.load(proj / "edit.json")
+    changed = tightcut.face_focus(proj, plan)
+    editjson.save(proj / "edit.json", plan)
+    for i, old, new in changed:
+        s = plan["segments"][i]
+        print(f"segments[{i}] {s['in']:.2f}-{s['out']:.2f}s zoom {s['zoom']}: focus {old} -> {new}")
+    print(f"face-focus: {len(changed)} zoomed segment(s) re-centred on the face")
 
 
 def cmd_takes(a):
@@ -262,7 +284,8 @@ def cmd_kwcheck(a):
 
 def cmd_review(a):
     proj = Path(a.project)
-    result = review(proj, editjson.load(proj / "edit.json"), load_style(a.style))
+    plan = editjson.load(proj / "edit.json")
+    result = review(proj, plan, _style(a, proj, plan))
     for c in result["checks"]:
         print(f"{'PASS' if c['ok'] else 'FAIL'}  {c['name']}: {c['detail']}")
     print("look at: " + ", ".join([result["sheet"], *result["cut_views"]]))
@@ -355,7 +378,7 @@ def _upload(a) -> bool:
 def cmd_reel_deliver(a):
     from . import reel
     from .deliver import gofile
-    out = reel.deliver(a.source, a.work, a.out_dir, style=a.style)
+    out = reel.deliver(a.source, a.work, a.out_dir, style=a.style, screens=a.screens)
     if not a.no_qc:
         from .qc import gate
         gate(out["master"], source=a.source)
@@ -517,6 +540,9 @@ def main(argv: list | None = None) -> None:
     p.add_argument("--steps", help="JSON list of steps: wait, scroll, tap, type, shot")
     p.add_argument("--device", default="phone", choices=["phone", "desktop"])
     p.add_argument("--wait", type=float, default=1.5, help="seconds to let the page settle")
+    p.add_argument("--cookie", action="append", help="name=value set for the site first (repeatable)")
+    p.add_argument("--hide", action="append", help="CSS selector hidden before the shot (repeatable)")
+    p.add_argument("--box", action="append", help="CSS selector whose box (CSS px) is printed as JSON (repeatable)")
     from . import cover
     p = add("cover", cover.cmd, "video", "out_dir")
     p.add_argument("--title", required=True, help="the headline: 2-5 words")
@@ -587,6 +613,7 @@ def main(argv: list | None = None) -> None:
     p.add_argument("--no-qc", action="store_true", help="deliver even if the quality check fails")
     p = add("reel-deliver", cmd_reel_deliver, "source", "work", "out_dir")
     p.add_argument("--style", default="default", help="style name (built-in or brand pack) or a .json path")
+    p.add_argument("--screens", help="screens.json: real app screens shown above the captions (see screencards)")
     p.add_argument("--upload", action="store_true",
                    help="also upload the master to Gofile (anyone with the link can download it)")
     p.add_argument("--no-upload", action="store_true", help="never upload, even with EDITOR_UPLOAD=gofile")
@@ -595,7 +622,7 @@ def main(argv: list | None = None) -> None:
     p.add_argument("--video", help="take the picture from this file (e.g. the retouched copy); audio from source")
     for name, fn in (("captions", cmd_captions), ("render", cmd_render), ("review", cmd_review)):
         p = add(name, fn, "project")
-        p.add_argument("--style", default="default")
+        p.add_argument("--style", help="brand or style name or .json path (default: the style edit.json names)")
         if name == "render":
             p.add_argument("--draft", action="store_true", help="fast encode for feedback rounds")
             p.add_argument("--master", action="store_true", help="maximum quality: near-lossless steps, CRF 10, 320k audio")
@@ -608,6 +635,7 @@ def main(argv: list | None = None) -> None:
     p.add_argument("--cap-tail", help="t,max pairs: cap the hiss-tail extension at out point t")
     p.add_argument("--no-framing", action="store_true")
     p.add_argument("--format", default="9:16", choices=sorted(FORMATS))
+    add("face-focus", cmd_face_focus, "project")
     p = add("takes", cmd_takes, "raw", "workdir")
     p.add_argument("--language", default="ar")
     p.add_argument("--keep", help="unit numbers (from takes.md) to keep, comma-separated")

@@ -28,6 +28,7 @@ SPECS = {
     "sticker": {"src": "logo.png", "pos": [0.8, 0.3], "w": 0.25},
     "title": {"text": "LOREM", "sub": "النتائج"},
     "flag": {"pos": [0.2, 0.2], "w": 0.36},
+    "glass": {"box": [0.1, 0.5, 0.9, 0.78]},
 }
 
 MARK = {"word": "acme", "badge": "#000000", "view": 100, "bars": [["#4c6ef5", 12, 30], ["#4c6ef5", 34, 50], ["#4c6ef5", 56, 70], ["#4c6ef5", 78, 90]]}
@@ -166,3 +167,14 @@ def test_glow_card_scrolls_its_line_then_settles_it():
 def test_endcard_slide_brings_a_white_panel_in_from_the_left():
     html = kit_html({"type": "endcard", "at": 0, "dur": 3, "slide": 0.45}, STYLE, SIZE, FONTS)
     assert 'id="pn"' in html and "xPercent:-120" in html
+
+
+def test_a_stack_number_can_count_up_to_its_text():
+    page = kit_html({"type": "stack", "at": 0, "dur": 2, "lines": [{"text": "1000", "color": "chrome", "count": [980, 0.6]}]},
+                    STYLE, SIZE, FONTS)
+    assert 'e.textContent="980"' in page and "v:1000.0,duration:0.6" in page
+
+
+def test_the_flag_can_be_chicagos():
+    page = kit_html({"type": "flag", "at": 0, "dur": 1, "design": "chicago"}, STYLE, SIZE, FONTS)
+    assert "#41B6E6" in page and "#E4002B" in page and "#c8102e" not in page

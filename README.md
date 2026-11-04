@@ -70,7 +70,9 @@ before every edit. `python -m editor profile` shows it. The questions are in `do
 
 - `skills/edit-video/SKILL.md`: the master editing skill. The agent follows it for every edit.
 - `skills/animate/SKILL.md`: animated films drawn in code (`animate-new`, `animate-snap`, `animate-sound`,
-  `animate-render`), with a finished example in `skills/animate/examples/sunset/`.
+  `animate-render`), with a finished example in `skills/animate/examples/sunset/`. `animate-new --onetake` makes
+  a film with no cuts, where every beat grows out of the last, and `animate-check` fails any hand-over that jumps
+  (example: `skills/animate/examples/onetake/`).
 - `skills/hyperframes-core`, `skills/hyperframes-animation`, `skills/talking-head-recut`: vendored HyperFrames
   skills for custom motion graphics (Apache-2.0, see `NOTICE`).
 - Presets in `docs/presets/`: finance and markets, event recaps, research-first scripting.

@@ -21,7 +21,7 @@ _LINE = {"hook": (9.0, 1.1), "quote": (6.4, 1.25), "item": (5.6, 1.25), "name": 
          "sub": (3.6, 1.25), "num": (20.0, 1.0), "label": (5.0, 1.25), "by": (3.8, 1.25),
          "headline": (6.0, 1.15), "src": (3.0, 1.25), "kinetic": (9.0, 1.1)}
 FIXED = ("credit", "chapter", "outro", "stack", "card", "badge", "bars", "leak", "endcard", "tiles", "poll", "balance",
-         "wave", "mark", "sticker", "title", "flag")  # fixed spot or full frame
+         "wave", "mark", "sticker", "title", "flag", "glass")  # fixed spot or full frame
 CHAR_EM = 0.55  # average glyph width in em, Latin and Arabic alike (Arabic runs a little narrower)
 ARABIC_LH = 1.15  # Arabic line boxes are taller
 
@@ -33,7 +33,8 @@ def _lines(text: str, font_vmin: float, width_vmin: float) -> int:
 def card_height_vmin(spec: dict, inner_width_vmin: float) -> float:
     """Estimated card height in vmin at scale 1."""
     t, arabic = spec["type"], captions.is_arabic(" ".join(
-        v if isinstance(v, str) else " ".join(v) for v in spec.values() if isinstance(v, (str, list))))
+        v if isinstance(v, str) else " ".join(x for x in v if isinstance(x, str))
+        for v in spec.values() if isinstance(v, (str, list))))
     lh = ARABIC_LH if arabic else 1.0
 
     def block(key, text):

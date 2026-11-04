@@ -80,6 +80,39 @@ the style bible from their words and show stills before going further. Ask once,
    lints, renders, mixes the sound to -14 LUFS and runs `qc`. Fix anything qc fails and render again. Deliver
    `out/film.mp4`, and tell the user what the film shows, the facts and their sources, and the fonts used.
 
+## One take (a film with no cuts)
+
+For a launch or product film that reads as one unbroken shot: nothing cuts or dissolves, and every beat grows out
+of the one before it (a dot becomes a button, the button a phone, the phone holds the clips, the clips become bars,
+the bars fold back into the dot). `examples/onetake/` is a finished 12 s film built this way; read its `shots.js`
+before drawing one.
+
+- **Scaffold with `--onetake`.** `animate-new <film> ... --onetake` sets `"mode": "onetake"` and `"blend": 0`: each
+  shot plays to its last frame and the next one starts from exactly what is on screen.
+- **Drive every carried thing from film time.** A shape that lives across shots is one value over the whole film,
+  `Studio.keys(s.t, [[t0, v0], [t1, v1], ...])`, computed the same way in every shot (the example draws one
+  `world(ctx, s)` from every shot). Then the last frame of a shot and the first of the next are the same frame by
+  construction. Never key a carried shape off `s.local` or `s.p`, which restart at every shot.
+- **Grow shapes, don't swap them.** A box is `{ x, y, w, h, r, fill, alpha }` (centre, size, corner radius, hex
+  colour); `Studio.morph(a, b, k)` passes through every size between, `Studio.box(ctx, b)` draws one. A thing that
+  leaves fades or shrinks into something still on screen; a new thing grows out of one already there.
+- **One camera.** Set `CAMERA` in `shots.js` to a function of film time returning `{ x, y, zoom, rot }`, keyed over
+  the whole film. It never resets at a shot's edge. `s.screen(fn)` draws outside the camera (a HUD, a plate).
+- **Keep words clear of the camera.** A push-in moves everything under the words: snap the zoomed moments and move
+  the shapes or soften the push until nothing slides under a line.
+- **No hit on a hand-over.** A beat that lands on a shot's first frame looks like a cut: keep hits inside shots.
+- **A cut only where it means something.** Mark the shot `"cut": true` in `shots.json` (a hard change of scene on
+  a word). Everywhere else the film must flow.
+- **Check every hand-over.** `python -m editor animate-check <film>` snapshots the two frames before each hand-over,
+  the hand-over and the frame after, and fails a hand-over that changes the picture more than three times the
+  motion around it (and more than a small floor). `animate-render` runs it first on a one-take film and refuses to
+  render a broken one. A pass reads like `ok record -> clips at 4.5s: hand-over 0.000 (motion around it 0.000 /
+  0.000)`; a cut reads around 0.5.
+- **Keep the background above black.** qc fails a stretch where almost every pixel is near black, which a dark
+  minimal one-take frame (one small dot) easily is: use a night colour like `#1e1e28`, not `#111`.
+- **Sound follows the hand.** Time effects to the moves that carry the film (`pop` as the dot appears, `riser` into
+  a grow, `impact` as it lands, `whoosh` on a stretch, `tick` per item, a `beat` while things hit), by shot id.
+
 ## Timing
 
 On a 4-core machine with no GPU, a 12 s 1080x1920 film snaps in about 20 s and renders in about 70 s.

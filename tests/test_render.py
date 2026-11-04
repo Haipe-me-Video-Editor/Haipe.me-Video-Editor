@@ -1,4 +1,4 @@
-from editor import render
+from editor import editjson, render
 
 
 def _plan():
@@ -137,3 +137,65 @@ def test_split_broll_puts_the_shot_on_top_and_the_speaker_below():
     assert "crop=1080:960:0:154" in f  # head and chest from 8% down the frame
     assert "overlay=0:960:enable='gte(t,0.4833)*lt(t,1.4833)'" in f  # the speaker's half goes in the lower half
     assert "overlay=0:0:enable='gte(t,0.4833)*lt(t,1.4833)'" in f
+
+
+def test_light_burns_convert_to_rgb_and_back_with_the_same_matrix():
+    # left to negotiation the way into RGB and the way out disagreed, and every frame came out 2-3 levels greener
+    parts, _ = render.transitions_filter([{"type": "leak", "at": 2.0}, {"type": "sweep", "at": 4.0}], "base", (1080, 1920))
+    graph = ";".join(parts)
+    assert graph.count("in_color_matrix=bt709:in_range=tv,format=gbrp") == 2
+    assert graph.count("out_color_matrix=bt709:out_range=tv,format=yuv420p") == 2
+
+
+def test_a_take_can_be_levelled_with_gain_db():
+    plan = {"segments": [{"src": "a.mp4", "in": 0, "out": 2, "gain_db": 3.5}, {"src": "a.mp4", "in": 4, "out": 6}]}
+    graph = render.voice_filter(plan, {"a.mp4": 0}, model="m.rnnn")
+    assert "volume=3.5dB," in graph and graph.count("volume=") == 1
+
+
+def test_broll_can_push_in_and_out_vertically():
+    p = _plan()
+    p["broll"][0].update(enter="push", exit="push", push_dur=0.4)
+    f = render.video_filter(p, {"raw/a.mp4": 0}, [(p["broll"][0], 1)], [], (1080, 1920))
+    assert "color=c=black:s=1080x1920" in f  # the speaker's shot moves over black
+    base_y, shot_y = render.push_y(0.5, 1.0, 0.4, ["enter", "exit"], 1920)
+    assert f"overlay=x=0:y='{base_y}':shortest=1" in f and f"overlay=x=0:y='{shot_y}'" in f
+    assert "between(t,0.5,0.9)*1920" in base_y  # in: the speaker is pushed down out of frame
+    assert "lt(t,0.9)*(-1920+1920" in shot_y  # while the shot comes down from above
+    assert "gte(t,1.1)*1920" in shot_y  # out: the shot carries on down
+
+
+def test_broll_push_is_validated():
+    p = _plan()
+    p["broll"][0].update(enter="slide")
+    assert any("enter must be" in e for e in editjson.validate(p))
+
+
+def test_a_push_keeps_its_focus_while_the_zoom_changes():
+    # crop's iw/ih are fixed at the first frame; a 1.42x -> 1.26x ease-out drifted 0.06 of the frame off centre
+    plan = {"segments": [{"src": "a.mp4", "in": 0, "out": 2, "zoom": 1.42, "push": 1.26, "push_dur": 1.0,
+                          "focus": [0.53, 0.54]}]}
+    f = ";".join(render.segments_filter(plan, {"a.mp4": 0}, (1080, 1920)))
+    assert "x='min(max((2*trunc(1080*(1.42+" in f and "iw*0.53" not in f
+
+
+def test_the_may_burn_and_the_drop_slide():
+    parts, _ = render.transitions_filter([{"type": "leak", "at": 2.0, "look": "may"}], "base", (1080, 1920))
+    assert "clip(A*(" in parts[0] and "between(t,1.8,2.4)" in parts[0]  # the May-1 keys run -0.2 .. +0.4 s
+    base_y, shot_y = render.push_y(1.0, 4.0, 0.5, ["enter", "exit"], 1920, style="drop")
+    assert "pow(" in base_y and "-0.6)/0.4" in shot_y  # the arriving shot lands in the last 40%
+    p = _plan()
+    p["broll"][0].update(enter="push", push_style="drop", push_dur=0.4)
+    f = render.video_filter(p, {"raw/a.mp4": 0}, [(p["broll"][0], 1)], [], (1080, 1920))
+    assert "avgblur=sizeX=1:sizeY=16:enable='between(t,0.72,0.9)'" in f  # blurred only while it moves fastest
+
+
+def test_glass_blurs_the_frame_under_its_card():
+    parts, cur = render.glass_parts({"type": "glass", "at": 1.0, "dur": 2.0, "box": [0.1, 0.5, 0.9, 0.78]},
+                                    "base", (1080, 1920), 0)
+    g = ";".join(parts)
+    assert cur == "gq0" and "crop=864:536:108:960" in g and "boxblur=luma_radius=26" in g
+    assert "alphamerge" in g and "fade=t=in:st=1.0" in g and "enable='between(t,1.0,3.0)'" in g
+    disc, _ = render.glass_parts({"type": "glass", "at": 0, "dur": 1, "box": [0.5, 0.5, 0.9, 0.7], "shape": "disc"},
+                                 "base", (1080, 1920), 1)
+    assert "hypot(" in ";".join(disc)
