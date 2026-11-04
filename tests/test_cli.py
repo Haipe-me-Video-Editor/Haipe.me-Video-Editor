@@ -106,3 +106,14 @@ def test_align_without_words_says_why(tmp_path):
     with pytest.raises(SystemExit) as e:
         main(["align", str(proj)])
     assert e.value.code == "align: transcript.json has no words to align (transcription was skipped or failed)"
+
+
+def test_render_uses_the_style_edit_json_names(tmp_path):
+    from argparse import Namespace
+
+    from editor.cli import _style
+    (tmp_path / "brand.json").write_text(json.dumps({"name": "brand", "accent": "#A747F7"}))
+    plan = {"style": "brand.json"}
+    assert _style(Namespace(style=None), tmp_path, plan)["accent"] == "#A747F7"
+    assert _style(Namespace(style="default"), tmp_path, plan)["name"] == "default"
+    assert _style(Namespace(style=None), tmp_path, {})["name"] == "default"

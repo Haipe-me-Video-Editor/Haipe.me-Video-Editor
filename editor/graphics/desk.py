@@ -170,12 +170,13 @@ def desk_html(spec: dict, style: dict, size: tuple, font_files: dict, image: str
     card = _w(spec["card"])
     rtl = is_arabic(_texts(card))
     d = spec["dur"]
+    top, bottom = style.get("desk_panel", PANEL)  # a brand with a tag at the top of the frame starts the panel under it
     mood = {"bull": style.get("up", "#22c55e"), "bear": style.get("down", "#ef4444")}.get(spec.get("mood"),
                                                                                          style["accent"])
     css = CSS % {**font_files, "ink": style["ink"], "accent": style["accent"], "bg": style.get("bg", "#101114"),
                  "bg2": style.get("bg2", style.get("bg", "#101114")), "up": style.get("up", "#22c55e"),
                  "down": style.get("down", "#ef4444"), "mood": mood,
-                 "ptop": PANEL[0] * 100, "pheight": round((PANEL[1] - PANEL[0]) * 100, 2)}
+                 "ptop": top * 100, "pheight": round((bottom - top) * 100, 2)}
     mark = f'<img id="mark" src="{html.escape(logo)}" alt="">' if logo else ""
     streaks = "".join(f'<div class="streak" style="top:{y}%"></div>' for y in (8, 30, 52))
     shift = -30 if rtl else 30

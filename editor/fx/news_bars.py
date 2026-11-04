@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from .. import fonts
 from . import _behind as B
 from . import _camera as cam
+from . import _glass as G
 
 NAME = "news_bars"
 DOC = ("Breaking-news strips (a coloured tag like BREAKING / JUST IN on a white bar with a heavy slanted headline) "
@@ -53,25 +54,30 @@ def sprite(tag: str, text: str, h: int, accent, rot: float, max_w: int) -> np.nd
     italic, rotated, with a soft shadow."""
     S = 2
     hh = h * S
-    font = str(fonts.ensure_font("Montserrat"))
-    f_tag = ImageFont.truetype(font, int(hh * 0.36))
+    # Arabic needs a face that has its letters, shaped right to left (Montserrat drew empty boxes), and reads from
+    # the right: the tag goes on the right end and the headline runs leftward from it
+    ar = G.is_arabic(text)
+    face = lambda t: str(fonts.ensure_font("Tajawal Black" if G.is_arabic(t) else "Montserrat"))
+    font = face(text)
+    dirn = "rtl" if ar else None
+    f_tag = ImageFont.truetype(face(tag), int(hh * 0.36), layout_engine=ImageFont.Layout.RAQM)
     probe = ImageDraw.Draw(Image.new("RGBA", (8, 8)))
-    tag_w = probe.textlength(tag, font=f_tag) + hh * 0.5
+    tag_w = probe.textlength(tag, font=f_tag, direction="rtl" if G.is_arabic(tag) else None) + hh * 0.5
     # one line if it fits at a readable size, else two balanced lines in a taller bar (the italic lean widens the
     # strip by SHEAR x its height, so that comes off the room too)
     for lines, top, floor in (([text], 0.6, 0.45), ([" ".join(w) for w in B.split_lines(text)[-1]], 0.42, 0.3)):
         room = max_w * S - tag_w - hh * 0.9 - SHEAR * hh * (1 if len(lines) == 1 else 1.6)
         size = int(hh * top)
-        f_text = ImageFont.truetype(font, size)
-        while max(probe.textlength(ln, font=f_text) for ln in lines) > room and size >= hh * floor:
+        f_text = ImageFont.truetype(font, size, layout_engine=ImageFont.Layout.RAQM)
+        while max(probe.textlength(ln, font=f_text, direction=dirn) for ln in lines) > room and size >= hh * floor:
             size -= 2
-            f_text = ImageFont.truetype(font, size)
+            f_text = ImageFont.truetype(font, size, layout_engine=ImageFont.Layout.RAQM)
         if size >= hh * floor:
             break
     else:
         raise ValueError(f"news_bars headline too long for one strip: {text!r}")
     bh = hh if len(lines) == 1 else int(hh * 1.6)
-    text_w = max(probe.textlength(ln, font=f_text) for ln in lines)
+    text_w = max(probe.textlength(ln, font=f_text, direction=dirn) for ln in lines)
     bar_w = int(tag_w + text_w + hh * 0.85)
     pad = int(hh * 0.6)
     im = Image.new("RGBA", (bar_w + 2 * pad, bh + 2 * pad), (0, 0, 0, 0))
@@ -80,12 +86,17 @@ def sprite(tag: str, text: str, h: int, accent, rot: float, max_w: int) -> np.nd
     d.rectangle([x0, y0, x0 + bar_w, y0 + bh], fill=(255, 255, 255, 255))
     th = hh * 0.78
     ty = y0 + (bh - th) / 2
-    d.rectangle([x0 + hh * 0.12, ty, x0 + hh * 0.12 + tag_w, ty + th], fill=tuple(accent) + (255,))
-    d.text((x0 + hh * 0.12 + tag_w / 2, y0 + bh / 2), tag, font=f_tag, fill=(255, 255, 255, 255), anchor="mm")
+    tx = x0 + bar_w - hh * 0.12 - tag_w if ar else x0 + hh * 0.12
+    d.rectangle([tx, ty, tx + tag_w, ty + th], fill=tuple(accent) + (255,))
+    d.text((tx + tag_w / 2, y0 + bh / 2), tag, font=f_tag, fill=(255, 255, 255, 255), anchor="mm",
+           direction="rtl" if G.is_arabic(tag) else None)
     lh = size * 1.12
     for k, ln in enumerate(lines):
         ly = y0 + bh / 2 + (k - (len(lines) - 1) / 2) * lh
-        d.text((x0 + hh * 0.12 + tag_w + hh * 0.3, ly), ln, font=f_text, fill=(12, 12, 14, 255), anchor="lm")
+        if ar:
+            d.text((tx - hh * 0.3, ly), ln, font=f_text, fill=(12, 12, 14, 255), anchor="rm", direction="rtl")
+        else:
+            d.text((tx + tag_w + hh * 0.3, ly), ln, font=f_text, fill=(12, 12, 14, 255), anchor="lm")
     # italic lean, then the tilt
     im = im.transform(im.size, Image.AFFINE, (1, SHEAR, -SHEAR * im.size[1] / 2, 0, 1, 0), Image.BICUBIC)
     im = im.rotate(rot, Image.BICUBIC, expand=True)

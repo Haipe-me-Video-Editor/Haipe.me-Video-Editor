@@ -177,13 +177,52 @@ def frame_shot(rows: list, a: float, b: float, tight: bool, face_w=FACE_W, headr
     if not sel:
         return 1.0, [0.5, 0.5]
     fw = float(np.median([r["fw"] for r in sel]))
+    z = min(MAX_ZOOM, max(1.0, face_w / fw)) * (punch if tight else 1.0)
+    return round(z, 3), _focus(sel, z, headroom, face_x)
+
+
+def _focus(sel: list, z: float, headroom: float, face_x: float) -> list:
+    """The crop centre [x, y] at zoom z that puts the face (medians of the rows) at face_x across and its hair top
+    headroom below the frame top, kept inside the frame."""
     cx = float(np.median([r["cx"] for r in sel]))
     top = float(np.median([r["top"] for r in sel]))
-    z = min(MAX_ZOOM, max(1.0, face_w / fw)) * (punch if tight else 1.0)
     fy = top - headroom / z + 0.5 / z
     fx = cx + (0.5 - face_x) / z
     lo, hi = 0.5 / z, 1 - 0.5 / z
-    return round(z, 3), [round(min(max(fx, lo), hi), 3), round(min(max(fy, lo), hi), 3)]
+    return [round(min(max(fx, lo), hi), 3), round(min(max(fy, lo), hi), 3)]
+
+
+def focus_shot(rows: list, a: float, b: float, z: float, headroom=HEADROOM, face_x=FACE_X) -> list | None:
+    """The crop centre for a shot whose zoom is already chosen (a punch-in planned by hand), from the face rows over
+    [a, b]; None when no face was found there."""
+    sel = [r for r in rows if r.get("fw", 0) > 0.15 and a <= r["t"] <= b]
+    return _focus(sel, z, headroom, face_x) if sel else None
+
+
+def track_rows(project, src: str) -> list:
+    """The face rows for project/src, cached in work/framing.json (keyed by the source)."""
+    project = Path(project)
+    fpath = project / "work" / "framing.json"
+    if fpath.exists() and json.loads(fpath.read_text()).get("src") == src:
+        return json.loads(fpath.read_text())["rows"]
+    rows = framing_track(project / src)
+    fpath.parent.mkdir(exist_ok=True)
+    fpath.write_text(json.dumps({"src": src, "rows": rows}))
+    return rows
+
+
+def face_focus(project, plan: dict) -> list:
+    """Point every zoomed segment's crop at the tracked face (a fixed guess like [0.5, 0.3] misses a speaker who sits
+    off centre or lower in a take). Changes plan in place; returns (index, old focus, new focus) per change."""
+    changed = []
+    for i, s in enumerate(plan["segments"]):
+        if s.get("zoom", 1.0) <= 1.0:
+            continue
+        f = focus_shot(track_rows(project, s["src"]), s["in"], s["out"], s["zoom"])
+        if f and f != s.get("focus"):
+            changed.append((i, s.get("focus"), f))
+            s["focus"] = f
+    return changed
 
 
 class TimeMap:
@@ -222,14 +261,7 @@ def build(project, src: str, start: float, end: float, keep_cuts=(), cut_pauses=
     path = project / src
     phrases = speech_phrases(path)
     spans, nominal = cut_spans(phrases, start, end, keep_cuts, cut_pauses, hf_track(path), tail_caps)
-    rows = []
-    if framing:
-        fpath = work / "framing.json"
-        if fpath.exists() and json.loads(fpath.read_text()).get("src") == src:
-            rows = json.loads(fpath.read_text())["rows"]
-        else:
-            rows = framing_track(path)
-            fpath.write_text(json.dumps({"src": src, "rows": rows}))
+    rows = track_rows(project, src) if framing else []
     segments = []
     for i, (a, b) in enumerate(spans):
         seg = {"src": src, "in": a, "out": b}

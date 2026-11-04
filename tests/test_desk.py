@@ -67,3 +67,9 @@ def test_video_filter_lays_the_cutout_over_the_desk():
     assert "[1:v]setpts=PTS-STARTPTS+2.0/TB,scale=out_color_matrix=bt709:out_range=tv,format=yuva420p[dk0]" in vf \
            and "scale=640:1136,scale=out_color_matrix=bt709:out_range=tv,format=yuva420p[fg0]" in vf
     assert "overlay=x=220:y=1040:enable='between(t,2.0,6.0)'" in vf
+
+
+def test_a_brand_can_start_the_desk_panel_lower():
+    card = {"dur": 3, "card": {"type": "steps", "title": "t", "items": ["a", "b"]}}
+    assert "top:12.5%;height:34.5%" in desk_html(card, STYLE, SIZE, FONTS)
+    assert "top:20.0%;height:29.0%" in desk_html(card, {**STYLE, "desk_panel": [0.2, 0.49]}, SIZE, FONTS)

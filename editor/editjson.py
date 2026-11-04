@@ -9,7 +9,7 @@ from .score import CALM_SFX, PLAYFUL_SFX
 
 GRAPHIC_TYPES = ("hook", "lower_third", "list", "stat", "quote", "ticker", "headline", "kinetic",
                  "credit", "chapter", "outro", "custom", "stack", "card", "badge", "bars", "leak", "endcard",
-                 "tiles", "poll", "balance", "wave", "mark", "sticker", "title", "flag")
+                 "tiles", "poll", "balance", "wave", "mark", "sticker", "title", "flag", "glass")
 CAPTION_MODES = ("source", "ar", "en", "bilingual")
 SFX_KINDS = ("whoosh", "pop", "thump", "hit", "tick", "riser", "ding", "shutter", "glitch", "coin",
              *PLAYFUL_SFX, *CALM_SFX)
@@ -135,6 +135,8 @@ def validate(plan) -> list:
             errs.append(f"segments[{i}]: push must be between 1.0 and 2.5")
         if "push_dur" in s and not (_num(s["push_dur"]) and s["push_dur"] > 0):
             errs.append(f"segments[{i}]: push_dur must be a positive number of seconds")
+        if "gain_db" in s and not (_num(s["gain_db"]) and -12 <= s["gain_db"] <= 12):
+            errs.append(f"segments[{i}]: gain_db must be between -12 and 12 (dB on this take's voice)")
         if "zoom" in s and not (_num(s["zoom"]) and 1.0 <= s["zoom"] <= 2.5):
             errs.append(f"segments[{i}]: zoom must be between 1.0 and 2.5")
         if "focus" in s and not (isinstance(s["focus"], list) and len(s["focus"]) == 2
@@ -174,6 +176,15 @@ def validate(plan) -> list:
                     errs.append(f"broll[{i}]: at must be >= 1.5 (face on screen first), or set open: true")
                 if _num(dur) and not 0.5 <= dur <= BROLL_MAX:
                     errs.append(f"broll[{i}]: dur must be between 0.5 and {BROLL_MAX} seconds")
+                for edge in ("enter", "exit"):
+                    if item.get(edge) not in (None, "cut", "push"):
+                        errs.append(f"broll[{i}]: {edge} must be 'cut' or 'push'")
+                if item.get("push_style", "push") not in ("push", "drop"):
+                    errs.append(f"broll[{i}]: push_style must be 'push' or 'drop'")
+                if item.get("push_dur") is not None and not (_num(item["push_dur"]) and 0.2 <= item["push_dur"] <= 1.0):
+                    errs.append(f"broll[{i}]: push_dur must be between 0.2 and 1.0 seconds")
+                if split and (item.get("enter") == "push" or item.get("exit") == "push"):
+                    errs.append(f"broll[{i}]: a push needs a full-frame shot")
             if key == "looks":
                 if item.get("type") not in LOOK_TYPES:
                     errs.append(f"looks[{i}]: type must be one of {LOOK_TYPES}")
@@ -212,6 +223,13 @@ def validate(plan) -> list:
                 if kind == "list" and not (isinstance(item.get("items"), list) and item["items"]
                                            and all(_text(x) for x in item["items"])):
                     errs.append(f"graphics[{i}]: list needs 'items', a non-empty list of non-empty strings")
+                if kind == "glass":
+                    box = item.get("box")
+                    if not (isinstance(box, list) and len(box) == 4 and all(_num(v) and 0 <= v <= 1 for v in box)
+                            and box[0] < box[2] and box[1] < box[3]):
+                        errs.append(f"graphics[{i}]: glass needs box [x0, y0, x1, y1] as fractions of the frame")
+                    if item.get("shape", "rect") not in ("rect", "disc"):
+                        errs.append(f"graphics[{i}]: glass shape must be 'rect' or 'disc'")
                 if kind == "stat" and item.get("dir") is not None and item["dir"] not in ("up", "down"):
                     errs.append(f"graphics[{i}]: stat 'dir' must be 'up' or 'down'")
                 if kind == "kinetic" and item.get("fx", "words") not in KINETIC_FX:

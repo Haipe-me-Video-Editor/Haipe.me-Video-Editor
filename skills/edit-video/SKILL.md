@@ -144,8 +144,11 @@ For a talking-head clip the user wants as recorded, with translated subtitles, r
 2. Read `words.md`; write `<work>/subs.json` = `[[start, end, "line\\Nline"], ...]` (source seconds, one idea per cue,
    ≤ 2 lines of ≤ 21 chars, timed to the words; Whisper starts after a pause can be early). Translate by meaning
    in natural language, not word for word.
-3. `python -m editor reel-deliver <clip> <work> <out> [--style <name>] [--upload]` → prints the master, the preview
-   and a Gofile link (public edition on the user's computer: only with `--upload` or `EDITOR_UPLOAD=gofile`).
+3. `python -m editor reel-deliver <clip> <work> <out> [--style <name>] [--screens screens.json] [--upload]` → prints
+   the master, the preview and a Gofile link (public edition on the user's computer: only with `--upload` or
+   `EDITOR_UPLOAD=gofile`). `--screens` shows real app screens while the speaker talks about them: a rounded card
+   above the captions over a blurred, dimmed copy of the speaker, an optional ring on the part they name, and a
+   label pill (format in `editor/screencards.py`; captures from `capture`, below).
 Send the master (or its Gofile link) and attach the preview; say the preview is compressed. List any phrase whose
 meaning was a judgment call.
 
@@ -173,9 +176,10 @@ squeak`) and calm (`shimmer swell triad`). A brand's skill says which palette it
 ## Real app screens (capture)
 
 Never draw an app screen: capture it. `python -m editor capture <url> <out.png|.mp4> [--steps steps.json]
-[--device phone|desktop]` opens the page in the local Chromium at phone size (390x693 CSS, 3x) and saves a sharp
+[--device phone|desktop] [--cookie name=value] [--hide <selector>] [--box <selector>]` opens the page in the local Chromium at phone size (390x693 CSS, 3x) and saves a sharp
 screenshot, or a 1080x1920 recording from Chromium's screencast while `steps` run (`wait`, eased `scroll`, `tap` a
-selector, `type`, extra `shot`s). Capture demo builds or public pages only, never a real customer's data, and never
+selector, `type`, extra `shot`s). `--cookie` sets a demo build's role or language first, `--hide` removes overlays
+(a demo bar, an install prompt) and `--box` prints an element's box in CSS pixels for a `screens.json` ring. Capture demo builds or public pages only, never a real customer's data, and never
 an action that writes data on a live site (a sign-up, a cart, a purchase) without the owner's yes. Use the result
 as B-roll, inside a phone frame, or as an orbit card.
 When the speaker names a website or a page, show it: record it with a `point` step on the exact words they talk
@@ -403,6 +407,8 @@ and `transcript_timeline.md`.
   the first 1.5 s. Concrete `query`. A `whoosh` at each entry.
 - **Punch-in:** a segment's `zoom` (1.0–2.5) crops around `focus: [x, y]` (fractions of the source frame;
   default the centre). Use it to land on a face or a reaction, e.g. `"zoom": 2.4, "focus": [0.5, 0.31]`.
+  `python -m editor face-focus <project>` sets `focus` on every zoomed segment from face tracking: run it after
+  planning the segments, since a speaker rarely sits at the frame's centre and moves between takes.
   `push` eases the zoom to a new value across the segment, or over `push_dur` seconds and then holds: split a take
   where the move starts for an eased push on an emphasis line without a cut.
 - **Ending:** `music.end` stops the bed at a time (a short fade, then silence: a logo sting takes over).

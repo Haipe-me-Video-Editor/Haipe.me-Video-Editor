@@ -64,3 +64,21 @@ def test_smoother_holds_through_two_missed_frames():
     assert s.update(P) is P
     assert s.update(None) is not None and s.update(None) is not None
     assert s.update(None) is None
+
+
+def test_brow_hairs_outside_the_landmark_line_keep_their_colour():
+    # MediaPipe's brow ring hugs the brow's centre; real hairs spread a few pixels above and below it. The mark
+    # remover once read those stray hairs as dark spots on skin and lightened them, so brows came out patchy and pale.
+    img, P = _landmarks_face_with_brow_hairs()
+    out = retouch.retouch_frame(img, P)
+    for y in (271, 299):  # hairs above and below the ring (centre 285, half-height 6)
+        hairs = np.s_[y, 180:260:3]
+        lift = (out[hairs].astype(float) - img[hairs]).mean()
+        assert lift < 2, f"brow hairs at y={y} lifted by {lift:.1f}"
+
+
+def _landmarks_face_with_brow_hairs():
+    img, P = _face(dark=0), _landmarks()
+    for y in (271, 299):
+        img[y, 180:260:3] -= 45  # thin dark hairs, clearly darker than the skin around them
+    return img, P

@@ -3,6 +3,7 @@ import hashlib
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from .. import ffmpeg, fonts
@@ -16,10 +17,18 @@ REMOTE = re.compile(r"""(?:\bsrc\s*=|\bsrcset\s*=|\bhref\s*=|url\(|@import|\bfro
 CHECKED_EXTS = (".html", ".htm", ".css", ".js", ".mjs", ".svg")
 
 
-def _hf(args: list, cwd: Path) -> None:
-    p = subprocess.run([str(HF_CLI), *args], cwd=cwd, env=hf_env(), capture_output=True, text=True)
-    if p.returncode != 0:
-        raise RuntimeError(f"hyperframes {' '.join(args)} failed:\n{p.stdout[-2000:]}\n{p.stderr[-2000:]}")
+CHROME_SLOW = "Chrome cannot start"  # its `--version` probe timed out: the CPU was busy, the browser is fine
+
+
+def _hf(args: list, cwd: Path, tries: int = 3) -> None:
+    for attempt in range(tries):
+        p = subprocess.run([str(HF_CLI), *args], cwd=cwd, env=hf_env(), capture_output=True, text=True, check=False)
+        if p.returncode == 0:
+            return
+        if CHROME_SLOW not in p.stdout + p.stderr or attempt == tries - 1:
+            break
+        time.sleep(5 * (attempt + 1))  # twice a render stopped here while another job loaded the CPU
+    raise RuntimeError(f"hyperframes {' '.join(args)} failed:\n{p.stdout[-2000:]}\n{p.stderr[-2000:]}")
 
 
 def check_local(comp: Path) -> None:

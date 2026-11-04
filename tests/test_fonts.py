@@ -105,3 +105,10 @@ def test_narrow_scales_outlines_advances_and_mark_anchors():
     assert min(x for x, _ in font["glyf"]["a"].coordinates) == 50
     assert max(x for x, _ in font["glyf"]["a"].coordinates) == 250
     assert (anchor.XCoordinate, anchor.YCoordinate) == (150, 700)
+
+
+def test_arabic_text_gets_an_arabic_face_drawn_right_to_left(monkeypatch):
+    from editor import fonts
+    monkeypatch.setattr(fonts, "ensure_font", lambda family: family)
+    assert fonts.face_for("BINANCE اتهكرت", "Montserrat") == ("Tajawal ExtraBold", "rtl")
+    assert fonts.face_for("BREAKING", "Montserrat") == ("Montserrat", None)

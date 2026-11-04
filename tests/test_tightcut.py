@@ -72,3 +72,20 @@ def test_pause_report_lists_kept_pauses_with_their_words():
     words = [[1.5, 2.0, "الخطة"], [2.3, 2.6, "هنا"]]
     rows = T.pause_report([[0.5, 2.0], [2.3, 3.0]], words, 0.0, 10.0)
     assert rows == [{"at": 2.0, "gap": 0.3, "before": "الخطة", "after": "هنا"}]
+
+
+def test_face_focus_centres_a_hand_planned_punch_in_on_the_face(tmp_path):
+    import json
+
+    from editor import tightcut
+    # the speaker sits left of centre and lower in the second shot than a fixed [0.5, 0.3] guess assumes
+    rows = [{"t": t / 5, "fw": 0.47, "cx": 0.43, "top": 0.12 if t < 50 else 0.24, "chin": 0.5} for t in range(100)]
+    (tmp_path / "work").mkdir()
+    (tmp_path / "work" / "framing.json").write_text(json.dumps({"src": "raw/a.mp4", "rows": rows}))
+    plan = {"segments": [{"src": "raw/a.mp4", "in": 0.0, "out": 9.0, "zoom": 1.0},
+                         {"src": "raw/a.mp4", "in": 10.5, "out": 19.0, "zoom": 1.25, "focus": [0.5, 0.3]}]}
+    changed = tightcut.face_focus(tmp_path, plan)
+    assert [c[0] for c in changed] == [1] and "focus" not in plan["segments"][0]  # 1.0 shots are left alone
+    fx, fy = plan["segments"][1]["focus"]
+    assert abs(fx - (0.43 + (0.5 - tightcut.FACE_X) / 1.25)) < 1e-3  # the face's own centre, not the frame's
+    assert fy > 0.5  # follows the lower head instead of cutting it off at the chin

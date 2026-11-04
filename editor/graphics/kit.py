@@ -17,7 +17,7 @@ import json
 from .spring import SPRING_TAG, spring_in
 
 KIT_TYPES = ("stack", "card", "badge", "bars", "leak", "endcard", "tiles", "poll", "balance", "wave", "mark",
-             "sticker", "title", "flag")
+             "sticker", "title", "flag", "glass")
 
 # Fonts each kit composition can use; render.py copies these files next to index.html.
 KIT_FONTS = {"ar": "Tajawal Medium", "arb": "Tajawal", "arh": "Lalezar", "hero": "Anton", "latin": "Montserrat",
@@ -215,6 +215,11 @@ def _stack(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
         items.append(f'<div class="row" style="text-align:{line.get("align", align)};transform:translateX({dx:.0f}px)">'
                      f'<span id="l{i}" class="lw" style="display:inline-block">{inner}</span></div>')
         script.append(_enter(f"#l{i}", line.get("t", 0.0), line.get("anim", "rise"), u))
+        if line.get("count") is not None:  # a number counting up to the line's text: count = [from, seconds]
+            n0, cd = line["count"]
+            script.append(f'(()=>{{const e=document.querySelector("#l{i} .ln"),o={{v:{float(n0)}}};e.textContent="{int(n0)}";'
+                          f'tl.to(o,{{v:{float(txt)},duration:{cd},ease:"power2.out",'
+                          f'onUpdate:()=>{{e.textContent=String(Math.round(o.v))}}}},{line.get("t", 0.0)});}})();')
         if line.get("strike") is not None:
             items[-1] = items[-1].replace('</span></span></div>', f'</span><i id="k{i}" class="strike"></i></span></div>')
             script.append(f'tl.fromTo("#k{i}",{{scaleX:0}},{{scaleX:1,duration:.35,ease:"power3.inOut"}},{line["strike"]});')
@@ -943,9 +948,20 @@ def _glow_card(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
     return _doc(size, d, css, f'<div id="gbg"></div>{"".join(rows)}', "\n  ".join(script), font_files, True)
 
 
+FLAG_DESIGNS = {  # drawn on the flag's source canvas `sx` (white already filled), width/height from `src`
+    "jp": 'sx.fillStyle="#c8102e";sx.beginPath();sx.arc(src.width/2,src.height/2,src.height*0.3,0,Math.PI*2);sx.fill();',
+    "chicago": ('const fw=src.width,fh=src.height;sx.fillStyle="#41B6E6";sx.fillRect(0,fh*2/12,fw,fh*2/12);'
+                'sx.fillRect(0,fh*8/12,fw,fh*2/12);sx.fillStyle="#E4002B";'
+                'for(const k of [0.26,0.42,0.58,0.74]){sx.beginPath();for(let j=0;j<12;j++){'
+                'const r=j%2?fh*0.045:fh*0.105,a=Math.PI*j/6-Math.PI/2;'
+                'sx.lineTo(fw*k+r*Math.cos(a),fh/2+r*Math.sin(a));}sx.closePath();sx.fill();}'),
+}
+
+
 def _flag(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
     """A waving cloth flag drawn on a canvas in vertical strips (a travelling sine wave lifts and shades each one),
-    tilted and slid in from the frame edge. design: 'jp' (white, red disc)."""
+    tilted and slid in from the frame edge. design: 'jp' (white, red disc) or 'chicago' (two light-blue bars, four
+    red six-pointed stars)."""
     W, H = size
     u = W / 1080
     d = spec["dur"]
@@ -961,7 +977,7 @@ def _flag(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
   const cv=document.getElementById("fc"),cx=cv.getContext("2d"),st={{p:0}};
   const src=document.createElement("canvas");src.width={round(fw)};src.height={round(fh)};
   const sx=src.getContext("2d");sx.fillStyle="#f4f4f6";sx.fillRect(0,0,src.width,src.height);
-  sx.fillStyle="#c8102e";sx.beginPath();sx.arc(src.width/2,src.height/2,src.height*0.3,0,Math.PI*2);sx.fill();
+  {FLAG_DESIGNS[spec.get("design", "jp")]}
   function draw(){{cx.clearRect(0,0,{cw},{ch});const n=60,sw=src.width/n;
     for(let i=0;i<n;i++){{const k=i/n,ph=st.p*6.0-k*7.0,amp={fh * 0.09:.1f}*k,dy=Math.sin(ph)*amp,sh=Math.cos(ph)*k;
       cx.drawImage(src,i*sw,0,sw+1,src.height,{pad:.1f}+i*sw,{pad:.1f}+dy,sw+1,src.height);
@@ -974,6 +990,28 @@ def _flag(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
                 font_files, False)
 
 
+def _glass(spec: dict, style: dict, size: tuple, font_files: dict) -> str:
+    """The frosted glass card (from a client's measured edits): a light tint, a hairline edge and a soft shadow over
+    a region the renderer blurs (render.glass_parts); text stacks go on top as their own graphics. shape: rect |
+    disc."""
+    W, H = size
+    u = W / 1080
+    x0, y0, x1, y1 = spec["box"]
+    disc = spec.get("shape", "rect") == "disc"
+    r = "50%" if disc else f"{spec.get('radius', 0.035) * W:.0f}px"
+    t = spec.get("t", 0.0)
+    d = spec["dur"]
+    css = (BASE_CSS % {"g": "16", "py": "14", "px": "54", "bw": "1.6", "sy": "6", "sb": "24"}
+           + f"#gl{{position:absolute;left:{x0 * W:.0f}px;top:{y0 * H:.0f}px;width:{(x1 - x0) * W:.0f}px;"
+             f"height:{(y1 - y0) * H:.0f}px;border-radius:{r};box-sizing:border-box;"
+             f"background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(255,255,255,.06));"
+             f"border:{1.6 * u:.1f}px solid rgba(255,255,255,.38);"
+             f"box-shadow:0 {10 * u:.0f}px {34 * u:.0f}px rgba(10,6,20,.28),inset 0 {1.5 * u:.1f}px 0 rgba(255,255,255,.25)}}")
+    script = (f'tl.fromTo("#gl",{{opacity:0,scale:.96}},{{opacity:1,scale:1,duration:.25,ease:"power2.out"}},{t:.3f});'
+              f'tl.to("#gl",{{opacity:0,scale:.98,duration:.25,ease:"power2.in"}},{max(d - .25, t + .3):.3f});')
+    return _doc(size, d, css, '<div id="gl"></div>', script, font_files, False)
+
+
 def kit_html(spec: dict, style: dict, size: tuple, font_files: dict, logo: str | None = None) -> str:
     t = spec["type"]
     if t == "stack":
@@ -982,6 +1020,8 @@ def kit_html(spec: dict, style: dict, size: tuple, font_files: dict, logo: str |
         return (_glow_card if spec.get("look") == "glow" else _card)(spec, style, size, font_files)
     if t == "flag":
         return _flag(spec, style, size, font_files)
+    if t == "glass":
+        return _glass(spec, style, size, font_files)
     if t == "badge":
         return _badge(spec, style, size, font_files)
     if t == "bars":

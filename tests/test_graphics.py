@@ -185,3 +185,34 @@ def test_centre_title_is_big_text_without_a_cutout():
     html = composition_html({"type": "kinetic", "dur": 2.0, "text": "EVENT", "place": "center"}, FINANCE,
                             (1080, 1920), FONTS)
     assert '<div id="center">' in html and "kinetic latin behind" in html
+
+
+def test_hyperframes_retries_when_chrome_is_slow_to_start(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from editor.graphics import render as R
+    calls = []
+
+    def fake_run(*a, **k):
+        calls.append(1)
+        out = "✗  Chrome cannot start" if len(calls) == 1 else "done"
+        return SimpleNamespace(returncode=1 if len(calls) == 1 else 0, stdout=out, stderr="")
+
+    monkeypatch.setattr(R.subprocess, "run", fake_run)
+    monkeypatch.setattr(R.time, "sleep", lambda s: None)
+    R._hf(["render", "."], tmp_path)
+    assert len(calls) == 2
+
+
+def test_hyperframes_does_not_retry_a_real_failure(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from editor.graphics import render as R
+    calls = []
+    monkeypatch.setattr(R.subprocess, "run",
+                        lambda *a, **k: calls.append(1) or SimpleNamespace(returncode=1, stdout="lint error", stderr=""))
+    with pytest.raises(RuntimeError, match="lint error"):
+        R._hf(["render", "."], tmp_path)
+    assert len(calls) == 1

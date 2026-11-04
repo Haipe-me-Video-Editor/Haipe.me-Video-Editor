@@ -138,3 +138,11 @@ def ensure_font(family: str) -> Path:
         part.unlink(missing_ok=True)
         raise
     return ttf
+
+
+def face_for(text: str, latin: str, arabic: str = "Tajawal ExtraBold") -> tuple:
+    """(TTF path, PIL text direction) for drawing `text` with PIL: an Arabic face shaped right to left when the text
+    has Arabic letters (a Latin face has none of their glyphs and draws empty boxes), else the Latin face."""
+    if any("\u0600" <= ch <= "\u06ff" for ch in text):
+        return ensure_font(arabic), "rtl"
+    return ensure_font(latin), None

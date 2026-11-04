@@ -1,0 +1,7 @@
+[
+  {"id": "dot", "start": 0, "dur": 2, "what": "one warm dot breathing in the middle of a dark frame, then swelling into a record button", "camera": "holds, then eases in a little", "words": "It starts with one dot."},
+  {"id": "record", "start": 2, "dur": 2.5, "what": "the record button pulses once, then stretches into a phone screen", "camera": "eases back to take in the phone", "words": "Press record."},
+  {"id": "clips", "start": 4.5, "dur": 3, "what": "four takes slide onto a timeline inside the phone, one after another", "camera": "pushes in on the timeline", "words": "Every take lands in order."},
+  {"id": "beat", "start": 7.5, "dur": 2.5, "what": "the phone falls away and the clips stand up as bars that jump on the beat", "camera": "tilts a little with the beat", "words": "Then it cuts on the beat."},
+  {"id": "back", "start": 10, "dur": 2, "what": "the bars fold into a line and the line shrinks back to the dot", "camera": "settles back where it began", "words": "And comes back to one dot."}
+]
