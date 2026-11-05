@@ -51,7 +51,10 @@ It cannot fill translations, so for `ar`, `en` or `bilingual` captions use the s
    seconds, a re-hook at the middle). Use it unless the user asked for a style, the profile's "never" list rules
    something out, or a brand skill says otherwise (brand rules always win for anything branded). Tell the user the
    style in one line. Never make a plain cut-and-captions edit unless they ask for one: every video gets the
-   style's signature effects, varied.
+   style's signature effects, varied. The palette draws on every effect in `editor/fx` except the ones the colour
+   rule refuses; the playful looks (`paper_cut`, `doodle_boil`, `green_screen`) join only when the profile's look
+   is playful or a brand skill allows them. `needs` in the plan lists what an effect wants from the user (the app's
+   screens for `ui_world`, a background for `green_screen`): ask for it, or pick another effect.
    **Plan.** Read only `transcript_timeline.md`, `sheets/index.json` with its sheets, and `edit.json`
    (plus `transcript_packed.md` when you trim or reorder segments, which use source seconds).
    Never extract individual frames. Place graphics, B-roll and SFX from `transcript_timeline.md`.

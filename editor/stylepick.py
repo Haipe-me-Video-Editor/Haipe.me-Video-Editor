@@ -17,34 +17,51 @@ import numpy as np
 
 STYLES = {
     "rapid_visual": "Rapid visual explainer: split screen, a new visual on every phrase (capture with point, stock, "
-                    "terminal / code_card / rank_list), short bold captions, a soft sound on every shot.",
-    "minimal_story": "Minimal storytelling: slow camera moves (pull_back, vertigo) on the story beats, line_art "
-                     "cards between, small serif captions, soft music, few sounds.",
+                    "terminal / code_card / rank_list / checklist_pop / counter_tally), short bold captions, a soft "
+                    "sound on every shot.",
+    "minimal_story": "Minimal storytelling: slow camera moves (pull_back, vertigo, lens) on the story beats, line_art "
+                     "cards and photo_drop between, small serif captions, soft music, few sounds.",
     "kinetic_captions": "Kinetic transparent captions: word_stack on the words that carry each line, outline and "
                         "freeze_callout on punchlines, snap zooms on stressed words.",
     "data_explainer": "Clean data explainer: chart_grow, list_tracker, checklist, glass_type on the numbers, gentle "
                       "zooms, a sticker outline for the serious beat.",
-    "energetic": "Energetic reel: beat_shake on the music, zoom_through between sections, motion_echo on big gestures, "
-                 "digital_zoom snaps, a sticker outline on the punchline.",
+    "energetic": "Energetic reel: beat_shake on the music, zoom_through / shatter / portal between sections, "
+                 "motion_echo on big gestures, digital_zoom and viewfinder punch-ins, news_bars for hype, a sticker "
+                 "outline on the punchline.",
 }
-# what each style draws on, by kind: camera moves, cut-out looks, type, cards, transitions
+# what each style draws on, by kind: camera moves, cut-out looks, type, cards, transitions. Every effect in
+# editor/fx is in at least one style, in PLAYFUL, or refused by the colour rule (fx.apply.RECOLOURS);
+# tests/test_stylepick.py fails when a new effect is in none of them.
 PALETTES = {
-    "rapid_visual": {"cards": ["terminal", "code_card", "rank_list", "checklist"],
-                     "type": ["word_stack", "glass_type"], "camera": ["digital_zoom", "zoom_through"],
-                     "cutout": ["outline", "freeze_callout"], "transition": ["zoom_through"]},
+    "rapid_visual": {"cards": ["terminal", "code_card", "rank_list", "checklist", "checklist_pop", "counter_tally",
+                               "ui_world", "orbit"],
+                     "type": ["word_stack", "glass_type", "news_bars"],
+                     "camera": ["digital_zoom", "zoom_through", "viewfinder", "portal"],
+                     "cutout": ["outline", "freeze_callout", "frame_break"], "transition": ["zoom_through", "shatter"]},
     "minimal_story": {"cutout": ["outline"], "cards": ["line_art"],
-                      "type": ["wall_text", "glass_type"], "camera": ["digital_zoom", "pull_back", "vertigo"],
-                      "transition": ["zoom_through"]},
-    "kinetic_captions": {"type": ["word_stack", "wall_text", "headline_wall"], "cutout": ["outline", "freeze_callout"],
-                         "camera": ["digital_zoom", "vertigo"], "cards": ["checklist"],
-                         "transition": ["zoom_through"]},
-    "data_explainer": {"cards": ["chart_grow", "list_tracker", "checklist", "rank_list"],
-                       "type": ["glass_type", "wall_text"], "camera": ["digital_zoom", "pull_back"],
+                      "type": ["wall_text", "glass_type"], "camera": ["digital_zoom", "pull_back", "vertigo", "lens"],
+                      "transition": ["zoom_through", "photo_drop"]},
+    "kinetic_captions": {"type": ["word_stack", "wall_text", "headline_wall", "news_bars", "cover_story"],
+                         "cutout": ["outline", "freeze_callout", "frame_break"],
+                         "camera": ["digital_zoom", "vertigo", "viewfinder", "portal", "lens"],
+                         "cards": ["checklist", "checklist_pop"], "transition": ["zoom_through", "photo_drop"]},
+    "data_explainer": {"cards": ["chart_grow", "list_tracker", "checklist", "rank_list", "counter_tally",
+                                 "checklist_pop"],
+                       "type": ["glass_type", "wall_text", "cover_story"], "camera": ["digital_zoom", "pull_back"],
                        "cutout": ["outline"], "transition": ["zoom_through"]},
-    "energetic": {"camera": ["beat_shake", "digital_zoom", "vertigo", "zoom_through"],
-                  "cutout": ["outline", "motion_echo", "freeze_callout"], "type": ["word_stack", "wall_text"],
-                  "transition": ["zoom_through"], "cards": ["rank_list"]},
+    "energetic": {"camera": ["beat_shake", "digital_zoom", "vertigo", "zoom_through", "viewfinder"],
+                  "cutout": ["outline", "motion_echo", "freeze_callout", "frame_break"],
+                  "type": ["word_stack", "wall_text", "news_bars"],
+                  "transition": ["zoom_through", "shatter", "portal"], "cards": ["rank_list", "checklist_pop"]},
 }
+# playful looks only: offered when the creator's look is playful (a brand skill may also allow them)
+PLAYFUL = {"cutout": ["paper_cut", "doodle_boil", "green_screen"]}
+PLAYFUL_LOOK = r"playful|fun|cartoon|cute|kids|مرح|كرتون"
+# what an effect needs that the script alone does not give
+NEEDS = {"ui_world": "the app's screens or clip thumbnails", "orbit": "screenshots or clip stills (text tiles work too)",
+         "green_screen": "a background image, or the built-in page from the spec",
+         "pull_back": "the app's name and the steps it shows"}
+
 TOPICS = {
     "tools": r"github|repo|code|claude|chatgpt|codex|\bai\b|app|website|site|tool|prompt|software|install|"
              r"برنامج|تطبيق|موقع|كود|ريبو|ذكاء|اداة|أداة",
@@ -159,12 +176,17 @@ def plan(proj, look: str = "") -> dict:
     proj = Path(proj)
     pic, speech = footage(proj), talk(proj)
     style, why = choose(pic, speech, look)
+    pal = {k: list(v) for k, v in PALETTES[style].items()}
+    if re.search(PLAYFUL_LOOK, look.lower()):
+        for k, v in PLAYFUL.items():
+            pal[k] = pal.get(k, []) + [e for e in v if e not in pal.get(k, [])]
     pal = {k: [e for e in v if not (e in NEEDS_HEADROOM and pic["headroom"] < 0.08)
-               and not (e in NEEDS_MOVEMENT and pic["movement"] < 0.2)] for k, v in PALETTES[style].items()}
+               and not (e in NEEDS_MOVEMENT and pic["movement"] < 0.2)] for k, v in pal.items()}
     dur = speech.get("edit_s") or speech["duration"] or 60.0
     n_fx = int(max(3, min(14, round(dur / 9))))
+    needs = {e: NEEDS[e] for v in pal.values() for e in v if e in NEEDS}
     return {"style": style, "describe": STYLES[style], "why": why, "footage": pic, "talk": speech,
-            "palette": pal, "effects": n_fx,
+            "palette": pal, "needs": needs, "effects": n_fx,
             "rhythm": {"hook": "something moves or lands in the first second: a zoom, a word, a visual",
                        "change_every_s": [1.5, 3.0] if style != "minimal_story" else [3.0, 6.0],
                        "effect_every_s": round(dur / n_fx, 1), "rehook_at_s": round(dur * 0.5, 1),
@@ -220,4 +242,5 @@ def cmd(a) -> None:
     (proj / "style-plan.json").write_text(json.dumps(p, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"style: {p['style']} ({'; '.join(p['why'])})\n{p['describe']}\n"
           f"about {p['effects']} effects, one every ~{p['rhythm']['effect_every_s']} s, from: "
-          + ", ".join(f"{k}: {'/'.join(v)}" for k, v in p["palette"].items() if v))
+          + ", ".join(f"{k}: {'/'.join(v)}" for k, v in p["palette"].items() if v)
+          + "".join(f"\n  {e} needs {n}" for e, n in p["needs"].items()))
