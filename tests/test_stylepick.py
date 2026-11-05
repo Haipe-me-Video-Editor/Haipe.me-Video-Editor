@@ -48,3 +48,36 @@ def test_check_flags_repeats_too_few_kinds_flat_stretches_and_no_hook():
             "fx": [{"type": t, "at": a} for t, a in (("word_stack", 2), ("outline", 9), ("terminal", 16),
                                                       ("digital_zoom", 22), ("glitch", 27))]}
     assert sp.check(good, {"effects": 5}) == []
+
+
+def _offered() -> set:
+    return {e for p in [*sp.PALETTES.values(), sp.PLAYFUL] for v in p.values() for e in v}
+
+
+def test_every_effect_has_a_place_and_none_is_misspelt():
+    """A new effect must be put in a style (or PLAYFUL, or refused by the colour rule); otherwise style-pick never
+    offers it and it sits unused."""
+    from editor.fx import registry
+    from editor.fx.apply import RECOLOURS
+    reg = set(registry())
+    assert _offered() <= reg, f"not effects: {sorted(_offered() - reg)}"
+    assert reg - _offered() - set(RECOLOURS) == set(), "add these to a style in stylepick.PALETTES or PLAYFUL"
+
+
+def test_no_style_offers_an_effect_the_render_refuses():
+    from editor.fx.apply import RECOLOURS, colour_errors
+    offered = _offered()
+    assert not offered & set(RECOLOURS)
+    assert [e for e in sorted(offered) if colour_errors({"type": e}, 0)] == []  # colour-true at their defaults
+    assert set(sp.NEEDS) <= offered
+
+
+def test_playful_effects_only_for_a_playful_look(tmp_path):
+    (tmp_path / "transcript.json").write_text(json.dumps({"words": [
+        {"w": "story", "start": 0, "end": 0.5}, {"w": "i was", "start": 1, "end": 1.5}]}))
+    playful = {e for v in sp.PLAYFUL.values() for e in v}
+    plain = sp.plan(tmp_path, "calm and clean")
+    fun = sp.plan(tmp_path, "playful and fun, cartoon stickers")
+    assert not playful & {e for v in plain["palette"].values() for e in v}
+    assert playful <= {e for v in fun["palette"].values() for e in v}
+    assert fun["needs"].get("green_screen") and "green_screen" not in plain["needs"]
